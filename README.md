@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RepoPilot
 
-## Getting Started
+AI onboarding copilot for GitHub repositories.
 
-First, run the development server:
+RepoPilot helps developers understand unfamiliar GitHub repositories by selectively indexing high-signal files, generating architecture diagrams, identifying key files, suggesting contribution tasks, and tracing execution flows through the codebase.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Live Demo
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+[Live Demo](https://repopilot-one.vercel.app/)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## GitHub Repository
 
-To learn more about Next.js, take a look at the following resources:
+[GitHub Repository](https://github.com/vizzzidane/repopilot)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## The Problem
 
-## Deploy on Vercel
+Developers often waste significant time trying to understand unfamiliar repositories before they can contribute productively.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Even experienced engineers struggle to:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- identify important files
+- understand repository architecture
+- trace execution flows
+- figure out where to start contributing
+- onboard quickly onto large codebases
+
+---
+
+## The Solution
+
+RepoPilot acts as an AI onboarding copilot for GitHub repositories.
+
+Instead of indexing an entire repository blindly, RepoPilot selectively extracts high-signal files such as:
+
+- README files
+- configuration files
+- app entry points
+- API routes
+- services
+- core source files
+
+Using those files, RepoPilot generates:
+
+- repository summaries
+- architecture explanations
+- architecture diagrams
+- onboarding guidance
+- contribution ideas
+- setup steps
+- execution flow traces
+- repository-specific Q&A
+
+---
+
+## Key Features
+
+### Selective Repository Indexing
+
+Indexes only high-signal files instead of flooding the context window with unnecessary code.
+
+### Repository Summary
+
+Generates a concise technical overview of the repository.
+
+### Architecture Diagrams
+
+Creates Mermaid-based visual architecture diagrams automatically.
+
+### Indexed Files Transparency
+
+Shows exactly which files were indexed for analysis.
+
+### GitHub File Links
+
+Provides grounded navigation directly back to GitHub source files.
+
+### Key Files to Inspect
+
+Highlights the most important files for onboarding.
+
+### Contribution Guidance
+
+Suggests beginner-friendly contribution starting points.
+
+### Risk and Unknowns Analysis
+
+Identifies unclear or potentially risky areas in the repository.
+
+### Repository-Specific Q&A
+
+Answers questions about the repository using the indexed files.
+
+### Execution Flow Tracing
+
+Traces execution paths and generates flow diagrams for repository-specific questions.
+
+---
+
+## Demo Repository
+
+Main demo repository used during presentation:
+
+```text
+https://github.com/vizzzidane/ipl-live-win-probability-predictor
