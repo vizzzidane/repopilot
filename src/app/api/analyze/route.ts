@@ -55,10 +55,47 @@ async function githubFetch(url: string) {
 
 function shouldExcludeFile(path: string) {
   const lower = path.toLowerCase();
+  const fileName = lower.split("/").pop() || "";
+
+  const sensitiveFileNames = [
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    ".env.test",
+    ".env.staging",
+    "secrets.json",
+    "secret.json",
+    "credentials.json",
+    "credential.json",
+    "service-account.json",
+    "service_account.json",
+    "firebase-adminsdk.json",
+    "google-services.json",
+    "aws-credentials",
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+  ];
+
+  const sensitiveExtensions = [
+    ".pem",
+    ".key",
+    ".crt",
+    ".cer",
+    ".p12",
+    ".pfx",
+    ".jks",
+    ".keystore",
+  ];
 
   return (
+    sensitiveFileNames.includes(fileName) ||
+    sensitiveExtensions.some((ext) => lower.endsWith(ext)) ||
     lower.includes("node_modules/") ||
     lower.includes(".next/") ||
+    lower.includes(".git/") ||
     lower.includes("dist/") ||
     lower.includes("build/") ||
     lower.includes("coverage/") ||
