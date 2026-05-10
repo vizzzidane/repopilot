@@ -22,16 +22,19 @@ const MAX_CHARS_PER_FILE_FOR_CHAT = 3000;
 const MAX_FILE_SIZE_BYTES = 40000;
 
 function parseGitHubUrl(repoUrl: string) {
-  const url = new URL(repoUrl);
-  const parts = url.pathname.split("/").filter(Boolean);
+  const trimmed = repoUrl.trim();
 
-  if (url.hostname !== "github.com" || parts.length < 2) {
-    throw new Error("Invalid GitHub URL");
+  const match = trimmed.match(
+    /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/?$/
+  );
+
+  if (!match) {
+    throw new Error("Please enter a valid public GitHub repository URL.");
   }
 
   return {
-    owner: parts[0],
-    repo: parts[1].replace(".git", ""),
+    owner: match[1],
+    repo: match[2].replace(/\.git$/, ""),
   };
 }
 
@@ -297,7 +300,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const repoUrl = body.repoUrl;
 
-    if (!repoUrl) {
+    if (!repoUrl || typeof repoUrl !== "string") {
       return NextResponse.json(
         { error: "Repository URL is required" },
         { status: 400 }
