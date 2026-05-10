@@ -20,6 +20,7 @@ const MAX_FILES_FOR_ANALYSIS = 16;
 const MAX_CHARS_PER_FILE_FOR_LLM = 2200;
 const MAX_CHARS_PER_FILE_FOR_CHAT = 3000;
 const MAX_FILE_SIZE_BYTES = 40000;
+const MAX_REPO_TREE_ITEMS = 5000;
 
 function parseGitHubUrl(repoUrl: string) {
   const trimmed = repoUrl.trim();
@@ -332,6 +333,16 @@ export async function POST(req: NextRequest) {
     const treeData = await githubFetch(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`
     );
+
+    if (!Array.isArray(treeData.tree)) {
+      throw new Error("Could not read repository file tree.");
+    }
+
+    if (treeData.tree.length > MAX_REPO_TREE_ITEMS) {
+      throw new Error(
+        "Repository is too large to analyse. Try a smaller public repository."
+      );
+    }
 
     const selectedFiles = selectImportantFiles(treeData.tree);
 
