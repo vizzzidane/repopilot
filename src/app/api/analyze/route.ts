@@ -6,6 +6,8 @@ import {
   getCachedRepoAnalysis,
   setCachedRepoAnalysis,
 } from "@/lib/repoCache";
+import { isBlockedFilePath } from "@/lib/security/blockedFiles";
+import { redactSecrets } from "@/lib/security/secretScan";
 
 type GitHubTreeItem = {
   path: string;
@@ -131,6 +133,7 @@ function shouldExcludeFile(path: string) {
   ];
 
   return (
+    isBlockedFilePath(path) ||
     sensitiveFileNames.includes(fileName) ||
     sensitiveExtensions.some((ext) => lower.endsWith(ext)) ||
     lower.includes("node_modules/") ||
@@ -297,6 +300,35 @@ function cleanJsonOutput(text: string) {
     .trim();
 }
 
+function sanitizeSelectedFilesForLLM(files: SelectedFile[]) {
+  return files.map((file) => {
+    if (isBlockedFilePath(file.path)) {
+      console.warn("Blocked sensitive file before LLM ingestion", {
+        filePath: file.path,
+      });
+
+      return {
+        ...file,
+        content: "[REDACTED: sensitive file path blocked]",
+      };
+    }
+
+    const { redactedContent, findings } = redactSecrets(file.content);
+
+    if (findings.length > 0) {
+      console.warn("Secret-like content redacted before LLM ingestion", {
+        filePath: file.path,
+        findingTypes: findings.map((finding) => finding.type),
+      });
+    }
+
+    return {
+      ...file,
+      content: redactedContent,
+    };
+  });
+}
+
 function buildRepoContext(files: SelectedFile[]) {
   return files
     .map(
@@ -431,7 +463,7 @@ export async function POST(req: NextRequest) {
         repoNameRaw: repo,
         repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
         defaultBranch: (cached.response.defaultBranch as string) || "main",
-        sourceFiles: cached.sourceFiles,
+        sourceFiles: sanitizeSelectedFilesForLLM(cached.sourceFiles),
         createdAt: new Date().toISOString(),
       });
 
@@ -474,10 +506,12 @@ export async function POST(req: NextRequest) {
       )
     );
 
-    const selectedFilesForLLM = selectedFiles.map((file, index) => ({
-      path: file.path,
-      content: fileContents[index],
-    }));
+    const selectedFilesForLLM = sanitizeSelectedFilesForLLM(
+      selectedFiles.map((file, index) => ({
+        path: file.path,
+        content: fileContents[index],
+      }))
+    );
 
     const totalContextChars = selectedFilesForLLM.reduce(
       (sum, file) => sum + file.content.length,
@@ -541,9 +575,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error({
-  route: "/api/analyze",
-  message: error instanceof Error ? error.message : "Unknown error",
-});
+      route: "/api/analyze",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
 
     return NextResponse.json(
       {
