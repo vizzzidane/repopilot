@@ -305,7 +305,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {analysis.sourceFiles?.length > 0 && (
+            {analysis.indexedFiles?.length > 0 && (
               <div className="rounded-3xl border border-white/10 bg-zinc-950 p-8">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
@@ -338,7 +338,7 @@ export default function HomePage() {
                       Indexed Files
                     </p>
                     <p className="mt-2 text-lg font-semibold text-white">
-                      {analysis.sourceFiles.length}
+                      {analysis.indexedFiles.length}
                     </p>
                   </div>
 
@@ -363,7 +363,7 @@ export default function HomePage() {
 
                 {indexedFilesOpen && (
                   <div className="mt-6 grid gap-3">
-                    {analysis.sourceFiles.map((file: any, index: number) => (
+                    {analysis.indexedFiles.map((file: any, index: number) => (
                       <a
                         key={file.path}
                         href={getGitHubFileUrl(file.path)}
