@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkAnalyzeRateLimit } from "@/lib/rateLimit";
 import { createAnalysisId, storeAnalysis } from "@/lib/analysisStore";
+import {
+  getCachedRepoAnalysis,
+  setCachedRepoAnalysis,
+} from "@/lib/repoCache";
 
 type GitHubTreeItem = {
   path: string;
@@ -413,6 +417,27 @@ export async function POST(req: NextRequest) {
 
     const { owner, repo } = parseGitHubUrl(repoUrl);
 
+    const cached = await getCachedRepoAnalysis(owner, repo);
+
+    if (cached?.response && cached?.sourceFiles) {
+      const analysisId = createAnalysisId();
+
+      await storeAnalysis(analysisId, {
+        repoOwner: owner,
+        repoNameRaw: repo,
+        repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
+        defaultBranch: (cached.response.defaultBranch as string) || "main",
+        sourceFiles: cached.sourceFiles,
+        createdAt: new Date().toISOString(),
+      });
+
+      return NextResponse.json({
+        analysisId,
+        ...cached.response,
+        cacheHit: true,
+      });
+    }
+
     const repoInfo = await githubFetch(
       `https://api.github.com/repos/${owner}/${repo}`
     );
@@ -476,9 +501,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
-    return NextResponse.json({
-      analysisId,
-
+    const responsePayload = {
       ...aiAnalysis,
 
       repoOwner: owner,
@@ -498,6 +521,14 @@ export async function POST(req: NextRequest) {
 
       indexingStrategy:
         "Secure server-side repository indexing with Redis-backed context storage.",
+    };
+
+    await setCachedRepoAnalysis(owner, repo, responsePayload, selectedFilesForLLM);
+
+    return NextResponse.json({
+      analysisId,
+      ...responsePayload,
+      cacheHit: false,
     });
   } catch (error) {
     console.error(error);
