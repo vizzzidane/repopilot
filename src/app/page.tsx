@@ -21,6 +21,32 @@ const CHAT_LOADING_STEPS = [
   "Writing grounded answer...",
 ];
 
+const MAX_MERMAID_CHARS = 4000;
+
+function sanitizeMermaidDiagram(input: unknown) {
+  if (typeof input !== "string") {
+    return "";
+  }
+
+  const trimmed = input.trim();
+
+  if (!trimmed.startsWith("graph TD")) {
+    return "";
+  }
+
+  if (trimmed.length > MAX_MERMAID_CHARS) {
+    return "";
+  }
+
+  const allowedPattern = /^[A-Za-z0-9\s\-_()[\]{}<>:;"'.,|/&#+=*]+$/;
+
+  if (!allowedPattern.test(trimmed)) {
+    return "";
+  }
+
+  return trimmed;
+}
+
 export default function HomePage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -122,7 +148,7 @@ export default function HomePage() {
       }
 
       setChatAnswer(data.answerMarkdown || data.answer || "");
-      setChatMermaidDiagram(data.mermaidDiagram || "");
+      setChatMermaidDiagram(sanitizeMermaidDiagram(data.mermaidDiagram));
 
       setTimeout(() => {
         answerRef.current?.scrollIntoView({
@@ -145,6 +171,12 @@ export default function HomePage() {
       setChatLoading(false);
     }
   }
+
+  const safeArchitectureDiagram = sanitizeMermaidDiagram(
+    analysis?.mermaidDiagram
+  );
+
+  const safeChatDiagram = sanitizeMermaidDiagram(chatMermaidDiagram);
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -403,13 +435,13 @@ export default function HomePage() {
                 {analysis.architectureExplanation}
               </p>
 
-              {analysis.mermaidDiagram && (
+              {safeArchitectureDiagram && (
                 <div className="mt-6">
                   <h3 className="mb-3 text-lg font-medium text-white">
                     Architecture Diagram
                   </h3>
 
-                  <MermaidDiagram chart={analysis.mermaidDiagram} />
+                  <MermaidDiagram chart={safeArchitectureDiagram} />
                 </div>
               )}
             </div>
@@ -647,7 +679,7 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  {chatMermaidDiagram && (
+                  {safeChatDiagram && (
                     <div className="mb-8">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-white">
@@ -659,7 +691,7 @@ export default function HomePage() {
                         </span>
                       </div>
 
-                      <MermaidDiagram chart={chatMermaidDiagram} />
+                      <MermaidDiagram chart={safeChatDiagram} />
                     </div>
                   )}
 
