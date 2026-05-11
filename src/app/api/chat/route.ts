@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkChatRateLimit } from "@/lib/rateLimit";
+import { getAnalysis } from "@/lib/analysisStore";
 
 type SourceFile = {
   path: string;
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const question = body.question || body.message || body.query;
-    const sourceFiles: SourceFile[] = body.sourceFiles || body.files || [];
+    const analysisId = body.analysisId;
 
     if (!question || typeof question !== "string") {
       return NextResponse.json(
@@ -93,14 +94,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!Array.isArray(sourceFiles) || sourceFiles.length === 0) {
+    if (!analysisId || typeof analysisId !== "string") {
       return NextResponse.json(
-        { error: "No source files were provided for this repository" },
+        { error: "analysisId is required" },
         { status: 400 }
       );
     }
 
-    const selectedFiles = cleanSourceFiles(sourceFiles);
+    const analysis = await getAnalysis(analysisId);
+
+    if (!analysis) {
+      return NextResponse.json(
+        {
+          error:
+            "Analysis session expired or not found. Please analyze the repository again.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const selectedFiles = cleanSourceFiles(analysis.sourceFiles);
+
     const repoContext = buildRepoContext(selectedFiles);
 
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {
@@ -177,11 +191,6 @@ mermaidDiagram rules:
 - No markdown fences.
 - Keep it compact.
 - Use simple arrows.
-Example:
-graph TD
-A[Request] --> B[Router]
-B --> C[Handler]
-C --> D[Response]
 `
       : `
 You are RepoPilot, an AI codebase onboarding agent.
