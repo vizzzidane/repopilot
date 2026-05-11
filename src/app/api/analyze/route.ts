@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { checkAnalyzeRateLimit } from "@/lib/rateLimit";
 
 type GitHubTreeItem = {
   path: string;
@@ -395,6 +396,12 @@ Mermaid diagram rules:
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimitResponse = await checkAnalyzeRateLimit(req);
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const body = await req.json();
     const repoUrl = body.repoUrl;
 

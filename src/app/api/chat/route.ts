@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { checkChatRateLimit } from "@/lib/rateLimit";
 
 type SourceFile = {
   path: string;
@@ -70,6 +71,12 @@ function removeMermaidFromMarkdown(markdown: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimitResponse = await checkChatRateLimit(req);
+
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("Missing OPENAI_API_KEY in .env.local");
     }
