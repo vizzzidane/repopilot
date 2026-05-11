@@ -7,21 +7,39 @@ const redis =
     ? Redis.fromEnv()
     : null;
 
-const analyzeRateLimit = redis
+const analyzeHourlyRateLimit = redis
   ? new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(5, "1 h"),
       analytics: true,
-      prefix: "repopilot:analyze",
+      prefix: "repopilot:analyze:hourly",
     })
   : null;
 
-const chatRateLimit = redis
+const analyzeDailyRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(20, "1 d"),
+      analytics: true,
+      prefix: "repopilot:analyze:daily",
+    })
+  : null;
+
+const chatHourlyRateLimit = redis
   ? new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(20, "1 h"),
       analytics: true,
-      prefix: "repopilot:chat",
+      prefix: "repopilot:chat:hourly",
+    })
+  : null;
+
+const chatDailyRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(80, "1 d"),
+      analytics: true,
+      prefix: "repopilot:chat:daily",
     })
   : null;
 
@@ -41,19 +59,30 @@ function getClientIp(req: NextRequest) {
 }
 
 export async function checkAnalyzeRateLimit(req: NextRequest) {
-  return checkRateLimit(req, analyzeRateLimit, "analyze");
+  return checkCombinedRateLimit(req, {
+    routeName: "analyze",
+    hourlyLimiter: analyzeHourlyRateLimit,
+    dailyLimiter: analyzeDailyRateLimit,
+  });
 }
 
 export async function checkChatRateLimit(req: NextRequest) {
-  return checkRateLimit(req, chatRateLimit, "chat");
+  return checkCombinedRateLimit(req, {
+    routeName: "chat",
+    hourlyLimiter: chatHourlyRateLimit,
+    dailyLimiter: chatDailyRateLimit,
+  });
 }
 
-async function checkRateLimit(
+async function checkCombinedRateLimit(
   req: NextRequest,
-  limiter: Ratelimit | null,
-  routeName: string
+  config: {
+    routeName: string;
+    hourlyLimiter: Ratelimit | null;
+    dailyLimiter: Ratelimit | null;
+  }
 ) {
-  if (!limiter) {
+  if (!config.hourlyLimiter || !config.dailyLimiter) {
     if (process.env.NODE_ENV === "production") {
       return NextResponse.json(
         {
@@ -68,21 +97,43 @@ async function checkRateLimit(
   }
 
   const ip = getClientIp(req);
-  const key = `${routeName}:${ip}`;
+  const key = `${config.routeName}:${ip}`;
 
-  const result = await limiter.limit(key);
+  const hourlyResult = await config.hourlyLimiter.limit(key);
 
-  if (!result.success) {
+  if (!hourlyResult.success) {
     return NextResponse.json(
       {
         error: "Too many requests. Please try again later.",
+        limitType: "hourly",
       },
       {
         status: 429,
         headers: {
-          "X-RateLimit-Limit": result.limit.toString(),
-          "X-RateLimit-Remaining": result.remaining.toString(),
-          "X-RateLimit-Reset": result.reset.toString(),
+          "X-RateLimit-Limit": hourlyResult.limit.toString(),
+          "X-RateLimit-Remaining": hourlyResult.remaining.toString(),
+          "X-RateLimit-Reset": hourlyResult.reset.toString(),
+          "X-RateLimit-Window": "hourly",
+        },
+      }
+    );
+  }
+
+  const dailyResult = await config.dailyLimiter.limit(key);
+
+  if (!dailyResult.success) {
+    return NextResponse.json(
+      {
+        error: "Daily usage limit reached. Please try again tomorrow.",
+        limitType: "daily",
+      },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": dailyResult.limit.toString(),
+          "X-RateLimit-Remaining": dailyResult.remaining.toString(),
+          "X-RateLimit-Reset": dailyResult.reset.toString(),
+          "X-RateLimit-Window": "daily",
         },
       }
     );
