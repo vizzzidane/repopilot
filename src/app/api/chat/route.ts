@@ -16,6 +16,9 @@ const MAX_FILES_FOR_CHAT = 12;
 const MAX_CHARS_PER_FILE = 2500;
 const MAX_TOTAL_CONTEXT_CHARS = 40000;
 
+const MAX_QUESTION_LENGTH = 1000;
+const MAX_ANALYSIS_ID_LENGTH = 100;
+
 function isTracingQuestion(question: string) {
   const q = question.toLowerCase();
 
@@ -94,9 +97,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (question.length > MAX_QUESTION_LENGTH) {
+      return NextResponse.json(
+        { error: "Question is too long." },
+        { status: 400 }
+      );
+    }
+
     if (!analysisId || typeof analysisId !== "string") {
       return NextResponse.json(
         { error: "analysisId is required" },
+        { status: 400 }
+      );
+    }
+
+    if (analysisId.length > MAX_ANALYSIS_ID_LENGTH) {
+      return NextResponse.json(
+        { error: "Invalid analysisId." },
         { status: 400 }
       );
     }
@@ -120,8 +137,7 @@ export async function POST(req: NextRequest) {
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {
       return NextResponse.json(
         {
-          error:
-            "Repository context is too large for chat analysis.",
+          error: "Repository context is too large for chat analysis.",
         },
         { status: 400 }
       );
