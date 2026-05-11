@@ -22,6 +22,8 @@ const MAX_CHARS_PER_FILE_FOR_CHAT = 3000;
 const MAX_FILE_SIZE_BYTES = 40000;
 const MAX_REPO_TREE_ITEMS = 5000;
 
+const FETCH_TIMEOUT_MS = 15000;
+
 function parseGitHubUrl(repoUrl: string) {
   const trimmed = repoUrl.trim();
 
@@ -39,12 +41,45 @@ function parseGitHubUrl(repoUrl: string) {
   };
 }
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = FETCH_TIMEOUT_MS
+) {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function githubFetch(url: string) {
   const headers: HeadersInit = {
     Accept: "application/vnd.github+json",
   };
 
-  const res = await fetch(url, { headers });
+  let res: Response;
+
+  try {
+    res = await fetchWithTimeout(url, { headers });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("GitHub request timed out.");
+    }
+
+    throw error;
+  }
 
   if (!res.ok) {
     throw new Error(`GitHub request failed: ${res.status}`);
@@ -232,7 +267,18 @@ async function fetchRawFile(
     .join("/");
 
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodedPath}`;
-  const res = await fetch(rawUrl);
+
+  let res: Response;
+
+  try {
+    res = await fetchWithTimeout(rawUrl);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return "";
+    }
+
+    return "";
+  }
 
   if (!res.ok) {
     return "";
