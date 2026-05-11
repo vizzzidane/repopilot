@@ -75,7 +75,25 @@ async function githubFetch(url: string) {
   }
 
   if (!res.ok) {
-    throw new Error(`GitHub request failed: ${res.status}`);
+    if (res.status === 404) {
+      throw new Error(
+        "Repository not found. It may be private, deleted, or the URL may be incorrect."
+      );
+    }
+
+    if (res.status === 403) {
+      throw new Error("GitHub API rate limit reached. Please try again later.");
+    }
+
+    if (res.status === 401) {
+      throw new Error("GitHub API authentication failed.");
+    }
+
+    if (res.status >= 500) {
+      throw new Error("GitHub is currently unavailable. Please try again later.");
+    }
+
+    throw new Error(`GitHub request failed with status ${res.status}`);
   }
 
   return res.json();
@@ -496,11 +514,23 @@ export async function POST(req: NextRequest) {
       `https://api.github.com/repos/${owner}/${repo}`
     );
 
+    if (repoInfo.archived) {
+      throw new Error("Archived repositories are not supported for analysis.");
+    }
+
+    if (!repoInfo.default_branch) {
+      throw new Error("Repository default branch could not be determined.");
+    }
+
     const defaultBranch = repoInfo.default_branch;
 
     const treeData = await githubFetch(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`
     );
+
+    if (treeData.truncated) {
+      throw new Error("Repository tree is too large for safe analysis.");
+    }
 
     if (!Array.isArray(treeData.tree)) {
       throw new Error("Could not read repository file tree.");
