@@ -10,6 +10,7 @@ import { validateGitHubRepoUrl } from "@/lib/github/validateRepo";
 import { isBlockedFilePath } from "@/lib/security/blockedFiles";
 import { redactSecrets } from "@/lib/security/secretScan";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
+import { createRequestId } from "@/lib/requestId";
 
 type GitHubTreeItem = {
   path: string;
@@ -442,6 +443,8 @@ Mermaid diagram rules:
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = createRequestId();
+
   try {
     const rateLimitResponse = await checkAnalyzeRateLimit(req);
 
@@ -590,12 +593,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error({
+      requestId,
       route: "/api/analyze",
       message: error instanceof Error ? error.message : "Unknown error",
     });
 
     return NextResponse.json(
       {
+        requestId,
         error:
           error instanceof Error
             ? error.message
