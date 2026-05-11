@@ -280,7 +280,10 @@ Rules:
       filesUsed: selectedFiles.map((file) => file.path),
     });
   } catch (error) {
-    console.error(error);
+    console.error({
+  route: "/api/chat",
+  message: error instanceof Error ? error.message : "Unknown error",
+});
 
     return NextResponse.json(
       {

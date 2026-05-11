@@ -6,7 +6,6 @@ import {
   getCachedRepoAnalysis,
   setCachedRepoAnalysis,
 } from "@/lib/repoCache";
-import { AnalyzeResponseSchema } from "@/lib/aiSchemas";
 
 type GitHubTreeItem = {
   path: string;
@@ -392,8 +391,7 @@ Mermaid diagram rules:
   });
 
   const cleaned = cleanJsonOutput(response.output_text);
-  const parsed = JSON.parse(cleaned);
-  return AnalyzeResponseSchema.parse(parsed);
+  return JSON.parse(cleaned);
 }
 
 export async function POST(req: NextRequest) {
@@ -542,7 +540,10 @@ export async function POST(req: NextRequest) {
       cacheHit: false,
     });
   } catch (error) {
-    console.error(error);
+    console.error({
+  route: "/api/analyze",
+  message: error instanceof Error ? error.message : "Unknown error",
+});
 
     return NextResponse.json(
       {
