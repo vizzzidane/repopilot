@@ -9,6 +9,7 @@ import {
 import { validateGitHubRepoUrl } from "@/lib/github/validateRepo";
 import { isBlockedFilePath } from "@/lib/security/blockedFiles";
 import { redactSecrets } from "@/lib/security/secretScan";
+import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 
 type GitHubTreeItem = {
   path: string;
@@ -400,14 +401,44 @@ Mermaid diagram rules:
 - Use simple arrows.
 `;
 
-  const response = await openai.responses.create({
-    model: "gpt-5.5",
-    input: prompt,
-    max_output_tokens: 3500,
-  });
+  const model = "gpt-5.5";
+  const start = Date.now();
 
-  const cleaned = cleanJsonOutput(response.output_text);
-  return JSON.parse(cleaned);
+  try {
+    const response = await openai.responses.create({
+      model,
+      input: prompt,
+      max_output_tokens: 3500,
+    });
+
+    logUsage({
+      route: "/api/analyze",
+      model,
+      latencyMs: Date.now() - start,
+      inputChars: prompt.length,
+      outputChars: response.output_text.length,
+      estimatedInputTokens: estimateTokensFromChars(prompt.length),
+      estimatedOutputTokens: estimateTokensFromChars(response.output_text.length),
+      success: true,
+    });
+
+    const cleaned = cleanJsonOutput(response.output_text);
+    return JSON.parse(cleaned);
+  } catch (error) {
+    logUsage({
+      route: "/api/analyze",
+      model,
+      latencyMs: Date.now() - start,
+      inputChars: prompt.length,
+      outputChars: 0,
+      estimatedInputTokens: estimateTokensFromChars(prompt.length),
+      estimatedOutputTokens: 0,
+      success: false,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
+
+    throw error;
+  }
 }
 
 export async function POST(req: NextRequest) {
