@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { checkChatRateLimit } from "@/lib/rateLimit";
 import { getAnalysis } from "@/lib/analysisStore";
 import { ChatResponseSchema } from "@/lib/aiSchemas";
+import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 
 type SourceFile = {
   path: string;
@@ -256,11 +257,45 @@ Rules:
 - mermaidDiagram must be an empty string.
 `;
 
-    const response = await openai.responses.create({
-      model: "gpt-5.5",
-      input: prompt,
-      max_output_tokens: tracingMode ? 2200 : 1600,
-    });
+    const model = "gpt-5.5";
+    const start = Date.now();
+
+    let response;
+
+    try {
+      response = await openai.responses.create({
+        model,
+        input: prompt,
+        max_output_tokens: tracingMode ? 2200 : 1600,
+      });
+
+      logUsage({
+        route: "/api/chat",
+        model,
+        latencyMs: Date.now() - start,
+        inputChars: prompt.length,
+        outputChars: response.output_text.length,
+        estimatedInputTokens: estimateTokensFromChars(prompt.length),
+        estimatedOutputTokens: estimateTokensFromChars(
+          response.output_text.length
+        ),
+        success: true,
+      });
+    } catch (error) {
+      logUsage({
+        route: "/api/chat",
+        model,
+        latencyMs: Date.now() - start,
+        inputChars: prompt.length,
+        outputChars: 0,
+        estimatedInputTokens: estimateTokensFromChars(prompt.length),
+        estimatedOutputTokens: 0,
+        success: false,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+
+      throw error;
+    }
 
     const rawText = response.output_text?.trim();
 
@@ -281,9 +316,9 @@ Rules:
     });
   } catch (error) {
     console.error({
-  route: "/api/chat",
-  message: error instanceof Error ? error.message : "Unknown error",
-});
+      route: "/api/chat",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
 
     return NextResponse.json(
       {
