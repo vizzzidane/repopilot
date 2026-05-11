@@ -6,6 +6,7 @@ import {
   getCachedRepoAnalysis,
   setCachedRepoAnalysis,
 } from "@/lib/repoCache";
+import { validateGitHubRepoUrl } from "@/lib/github/validateRepo";
 import { isBlockedFilePath } from "@/lib/security/blockedFiles";
 import { redactSecrets } from "@/lib/security/secretScan";
 
@@ -32,23 +33,6 @@ const MAX_REPO_URL_LENGTH = 200;
 const MAX_TOTAL_LLM_CONTEXT_CHARS = 50000;
 
 const FETCH_TIMEOUT_MS = 15000;
-
-function parseGitHubUrl(repoUrl: string) {
-  const trimmed = repoUrl.trim();
-
-  const match = trimmed.match(
-    /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/?$/
-  );
-
-  if (!match) {
-    throw new Error("Please enter a valid public GitHub repository URL.");
-  }
-
-  return {
-    owner: match[1],
-    repo: match[2].replace(/\.git$/, ""),
-  };
-}
 
 async function fetchWithTimeout(
   url: string,
@@ -451,7 +435,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { owner, repo } = parseGitHubUrl(repoUrl);
+    const { owner, repo } = validateGitHubRepoUrl(repoUrl);
 
     const cached = await getCachedRepoAnalysis(owner, repo);
 
