@@ -4,6 +4,7 @@ import { checkChatRateLimit } from "@/lib/rateLimit";
 import { getAnalysis } from "@/lib/analysisStore";
 import { ChatResponseSchema } from "@/lib/aiSchemas";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
+import { createRequestId } from "@/lib/requestId";
 
 type SourceFile = {
   path: string;
@@ -89,6 +90,8 @@ function parseChatOutput(rawText: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = createRequestId();
+
   try {
     const rateLimitResponse = await checkChatRateLimit(req);
 
@@ -316,12 +319,14 @@ Rules:
     });
   } catch (error) {
     console.error({
+      requestId,
       route: "/api/chat",
       message: error instanceof Error ? error.message : "Unknown error",
     });
 
     return NextResponse.json(
       {
+        requestId,
         error:
           error instanceof Error
             ? error.message
