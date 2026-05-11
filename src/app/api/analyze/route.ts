@@ -22,6 +22,8 @@ const MAX_FILES_FOR_ANALYSIS = 16;
 const MAX_CHARS_PER_FILE_FOR_LLM = 2200;
 const MAX_FILE_SIZE_BYTES = 40000;
 const MAX_REPO_TREE_ITEMS = 5000;
+const MAX_REPO_URL_LENGTH = 200;
+const MAX_TOTAL_LLM_CONTEXT_CHARS = 50000;
 
 const FETCH_TIMEOUT_MS = 15000;
 
@@ -402,6 +404,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (repoUrl.length > MAX_REPO_URL_LENGTH) {
+      return NextResponse.json(
+        { error: "Repository URL is too long." },
+        { status: 400 }
+      );
+    }
+
     const { owner, repo } = parseGitHubUrl(repoUrl);
 
     const repoInfo = await githubFetch(
@@ -440,6 +449,15 @@ export async function POST(req: NextRequest) {
       path: file.path,
       content: fileContents[index],
     }));
+
+    const totalContextChars = selectedFilesForLLM.reduce(
+      (sum, file) => sum + file.content.length,
+      0
+    );
+
+    if (totalContextChars > MAX_TOTAL_LLM_CONTEXT_CHARS) {
+      throw new Error("Repository context is too large to analyse safely.");
+    }
 
     const aiAnalysis = await analyzeWithOpenAI({
       repoName: repoInfo.name,
