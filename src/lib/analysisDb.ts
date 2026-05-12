@@ -52,3 +52,11 @@ export async function getUserAnalysesFromDb(
     take: 50,
   });
 }
+
+export async function getAnalysisFromDb(analysisId: string) {
+  return prisma.analysis.findUnique({
+    where: {
+      id: analysisId,
+    },
+  });
+}

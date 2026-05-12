@@ -6,6 +6,7 @@ import { ChatResponseSchema } from "@/lib/aiSchemas";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
 import { auth } from "@clerk/nextjs/server";
+import { getAnalysisFromDb } from "@/lib/analysisDb";
 
 type SourceFile = {
   path: string;
@@ -147,7 +148,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const analysis = await getAnalysis(analysisId);
+   const redisAnalysis = await getAnalysis(analysisId);
+const dbAnalysis = redisAnalysis ? null : await getAnalysisFromDb(analysisId);
+
+const analysis = redisAnalysis ?? dbAnalysis;
 
 if (!analysis) {
   return NextResponse.json(
@@ -168,7 +172,21 @@ if (analysis.userId !== userId) {
   );
 }
 
-    const selectedFiles = cleanSourceFiles(analysis.sourceFiles);
+const rawSourceFiles: unknown[] = Array.isArray(analysis.sourceFiles)
+  ? analysis.sourceFiles
+  : [];
+
+const selectedFiles = cleanSourceFiles(
+  rawSourceFiles.filter(
+    (file): file is SourceFile =>
+      typeof file === "object" &&
+      file !== null &&
+      "path" in file &&
+      "content" in file &&
+      typeof (file as { path?: unknown }).path === "string" &&
+      typeof (file as { content?: unknown }).content === "string"
+  )
+);
     const repoContext = buildRepoContext(selectedFiles);
 
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {
