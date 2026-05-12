@@ -5,6 +5,7 @@ import { getAnalysis } from "@/lib/analysisStore";
 import { ChatResponseSchema } from "@/lib/aiSchemas";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
+import { auth } from "@clerk/nextjs/server";
 
 type SourceFile = {
   path: string;
@@ -93,6 +94,16 @@ export async function POST(req: NextRequest) {
   const requestId = createRequestId();
 
   try {
+        const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          error: "Authentication required.",
+        },
+        { status: 401 }
+      );
+    }
     const rateLimitResponse = await checkChatRateLimit(req);
 
     if (rateLimitResponse) {
@@ -138,15 +149,24 @@ export async function POST(req: NextRequest) {
 
     const analysis = await getAnalysis(analysisId);
 
-    if (!analysis) {
-      return NextResponse.json(
-        {
-          error:
-            "Analysis session expired or not found. Please analyze the repository again.",
-        },
-        { status: 404 }
-      );
-    }
+if (!analysis) {
+  return NextResponse.json(
+    {
+      error:
+        "Analysis session expired or not found. Please analyze the repository again.",
+    },
+    { status: 404 }
+  );
+}
+
+if (analysis.userId !== userId) {
+  return NextResponse.json(
+    {
+      error: "You do not have access to this analysis session.",
+    },
+    { status: 403 }
+  );
+}
 
     const selectedFiles = cleanSourceFiles(analysis.sourceFiles);
     const repoContext = buildRepoContext(selectedFiles);

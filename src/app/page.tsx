@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import MermaidDiagram from "@/components/MermaidDiagram";
@@ -48,6 +49,7 @@ function sanitizeMermaidDiagram(input: unknown) {
 }
 
 export default function HomePage() {
+  const { isSignedIn } = useUser();
   const [repoUrl, setRepoUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -181,6 +183,36 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-6xl px-6 py-16">
+        <header className="mb-12 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold tracking-tight text-white">
+              RepoPilot
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              AI onboarding copilot for GitHub repositories
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {!isSignedIn && (
+              <SignInButton mode="modal">
+                <button className="rounded-full border border-white/10 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-zinc-200">
+                  Sign in
+                </button>
+              </SignInButton>
+            )}
+
+            {isSignedIn && (
+              <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                <span className="hidden text-xs text-zinc-400 sm:inline">
+                  Signed in
+                </span>
+                <UserButton />
+              </div>
+            )}
+          </div>
+        </header>
+
         <section className="text-center">
           <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-zinc-300 backdrop-blur">
             AI codebase intelligence platform
@@ -195,6 +227,13 @@ export default function HomePage() {
             insights, execution traces, onboarding guidance, contribution plans,
             and grounded engineering answers.
           </p>
+
+          {!isSignedIn && (
+            <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm leading-7 text-zinc-300">
+              Sign in to start building a private RepoPilot workspace with saved
+              analyses, ownership checks, and user-scoped usage limits.
+            </div>
+          )}
 
           <div className="mx-auto mt-10 flex max-w-3xl flex-col gap-4 sm:flex-row">
             <input

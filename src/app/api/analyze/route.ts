@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkAnalyzeRateLimit } from "@/lib/rateLimit";
-import { createAnalysisId, storeAnalysis } from "@/lib/analysisStore";
+import {
+  addAnalysisToUserHistory,
+  createAnalysisId,
+  storeAnalysis,
+} from "@/lib/analysisStore";
+import { auth } from "@clerk/nextjs/server";
 import {
   getCachedRepoAnalysis,
   setCachedRepoAnalysis,
@@ -464,6 +469,16 @@ export async function POST(req: NextRequest) {
   const requestId = createRequestId();
 
   try {
+        const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          error: "Authentication required.",
+        },
+        { status: 401 }
+      );
+    }
     const rateLimitResponse = await checkAnalyzeRateLimit(req);
 
     if (rateLimitResponse) {
@@ -495,11 +510,20 @@ export async function POST(req: NextRequest) {
       const analysisId = createAnalysisId();
 
       await storeAnalysis(analysisId, {
+        userId,
         repoOwner: owner,
         repoNameRaw: repo,
         repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
         defaultBranch: (cached.response.defaultBranch as string) || "main",
         sourceFiles: sanitizeSelectedFilesForLLM(cached.sourceFiles),
+        createdAt: new Date().toISOString(),
+      });
+
+      await addAnalysisToUserHistory(userId, {
+        analysisId,
+        repoOwner: owner,
+        repoNameRaw: repo,
+        repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
         createdAt: new Date().toISOString(),
       });
 
@@ -579,11 +603,20 @@ export async function POST(req: NextRequest) {
     const analysisId = createAnalysisId();
 
     await storeAnalysis(analysisId, {
+      userId,
       repoOwner: owner,
       repoNameRaw: repo,
       repoHtmlUrl: repoInfo.html_url,
       defaultBranch,
       sourceFiles: selectedFilesForLLM,
+      createdAt: new Date().toISOString(),
+    });
+
+    await addAnalysisToUserHistory(userId, {
+      analysisId,
+      repoOwner: owner,
+      repoNameRaw: repo,
+      repoHtmlUrl: repoInfo.html_url,
       createdAt: new Date().toISOString(),
     });
 
