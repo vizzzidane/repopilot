@@ -17,13 +17,19 @@ export async function GET() {
 
     const analyses = await getUserAnalysesFromDb(userId);
 
-    const history = analyses.map((analysis) => ({
-        analysisId: analysis.id,
-        repoOwner: analysis.repoOwner,
-        repoNameRaw: analysis.repoNameRaw,
-        repoHtmlUrl: analysis.repoHtmlUrl,
-        createdAt: analysis.createdAt.toISOString(),
-    }));
+    const history = analyses.map((analysis: {
+        id: string;
+        repoOwner: string;
+        repoNameRaw: string;
+        repoHtmlUrl: string;
+        createdAt: Date;
+        }) => ({
+            analysisId: analysis.id,
+            repoOwner: analysis.repoOwner,
+            repoNameRaw: analysis.repoNameRaw,
+            repoHtmlUrl: analysis.repoHtmlUrl,
+            createdAt: analysis.createdAt.toISOString(),
+        }));
 
     return NextResponse.json({
       history,
