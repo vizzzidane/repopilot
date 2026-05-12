@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 
 type SaveAnalysisParams = {
   id: string;
@@ -10,7 +9,10 @@ type SaveAnalysisParams = {
   repoHtmlUrl: string;
   defaultBranch: string;
 
-  sourceFiles: Prisma.InputJsonValue;
+  sourceFiles: {
+    path: string;
+    content: string;
+  }[];
 
   createdAt?: string;
 };
