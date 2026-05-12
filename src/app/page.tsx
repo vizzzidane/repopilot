@@ -5,6 +5,7 @@ import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import MermaidDiagram from "@/components/MermaidDiagram";
+import HistoryPanel from "@/components/HistoryPanel";
 
 const ANALYZE_LOADING_STEPS = [
   "Fetching repository tree...",
@@ -235,26 +236,40 @@ export default function HomePage() {
             </div>
           )}
 
-          <div className="mx-auto mt-10 flex max-w-3xl flex-col gap-4 sm:flex-row">
-            <input
-              type="text"
-              placeholder="Paste a GitHub repository URL..."
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") analyzeRepo();
-              }}
-              className="flex-1 rounded-2xl border border-white/10 bg-zinc-900 px-5 py-4 text-white outline-none transition focus:border-white/30"
-            />
+          {isSignedIn ? (
+            <div className="mx-auto mt-10 flex max-w-3xl flex-col gap-4 sm:flex-row">
+              <input
+                type="text"
+                placeholder="Paste a GitHub repository URL..."
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") analyzeRepo();
+                }}
+                className="flex-1 rounded-2xl border border-white/10 bg-zinc-900 px-5 py-4 text-white outline-none transition focus:border-white/30"
+              />
 
-            <button
-              onClick={analyzeRepo}
-              disabled={loading}
-              className="rounded-2xl bg-white px-6 py-4 font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
-            >
-              {loading ? "Indexing Repo..." : "Analyze Repo"}
-            </button>
-          </div>
+              <button
+                onClick={analyzeRepo}
+                disabled={loading}
+                className="rounded-2xl bg-white px-6 py-4 font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
+              >
+                {loading ? "Indexing Repo..." : "Analyze Repo"}
+              </button>
+            </div>
+          ) : (
+            <div className="mx-auto mt-10 max-w-xl rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <p className="text-sm leading-7 text-zinc-300">
+                Sign in to analyze repositories, save your history, and ask repo-specific questions.
+              </p>
+
+              <SignInButton mode="modal">
+                <button className="mt-4 rounded-2xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200">
+                  Sign in to continue
+                </button>
+              </SignInButton>
+            </div>
+          )}
 
           {loading && (
             <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-left">
@@ -797,6 +812,10 @@ export default function HomePage() {
             </div>
           </section>
         )}
+      </div>
+
+      <div className="mx-auto mt-10 w-full max-w-6xl">
+        {isSignedIn && <HistoryPanel />}
       </div>
     </main>
   );
