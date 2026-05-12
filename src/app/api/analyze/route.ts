@@ -16,6 +16,7 @@ import { isBlockedFilePath } from "@/lib/security/blockedFiles";
 import { redactSecrets } from "@/lib/security/secretScan";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
+import { saveAnalysisToDb } from "@/lib/analysisDb";
 
 type GitHubTreeItem = {
   path: string;
@@ -519,6 +520,21 @@ export async function POST(req: NextRequest) {
         createdAt: new Date().toISOString(),
       });
 
+      await saveAnalysisToDb({
+        id: analysisId,
+        userId,
+
+        repoOwner: owner,
+        repoNameRaw: repo,
+
+        repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
+        defaultBranch: (cached.response.defaultBranch as string) || "main",
+
+        sourceFiles: sanitizeSelectedFilesForLLM(cached.sourceFiles),
+
+        createdAt: new Date().toISOString(),
+      });
+
       await addAnalysisToUserHistory(userId, {
         analysisId,
         repoOwner: owner,
@@ -609,6 +625,21 @@ export async function POST(req: NextRequest) {
       repoHtmlUrl: repoInfo.html_url,
       defaultBranch,
       sourceFiles: selectedFilesForLLM,
+      createdAt: new Date().toISOString(),
+    });
+
+    await saveAnalysisToDb({
+      id: analysisId,
+      userId,
+
+      repoOwner: owner,
+      repoNameRaw: repo,
+
+      repoHtmlUrl: repoInfo.html_url,
+      defaultBranch,
+
+      sourceFiles: selectedFilesForLLM,
+
       createdAt: new Date().toISOString(),
     });
 
