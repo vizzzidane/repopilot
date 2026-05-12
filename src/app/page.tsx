@@ -190,7 +190,7 @@ export default function HomePage() {
               RepoPilot
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              AI onboarding copilot for GitHub repositories
+              AI onboarding copilot
             </p>
           </div>
 
@@ -216,7 +216,7 @@ export default function HomePage() {
 
         <section className="text-center">
           <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-zinc-300 backdrop-blur">
-            AI codebase intelligence platform
+            GitHub repo intelligence
           </div>
 
           <h1 className="mt-6 text-5xl font-bold tracking-tight text-white sm:text-6xl">
@@ -224,17 +224,9 @@ export default function HomePage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-zinc-400">
-            RepoPilot selectively indexes repositories and generates architecture
-            insights, execution traces, onboarding guidance, contribution plans,
-            and grounded engineering answers.
+            Analyze public GitHub repositories, understand architecture, trace
+            execution flow, and generate onboarding guidance.
           </p>
-
-          {!isSignedIn && (
-            <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm leading-7 text-zinc-300">
-              Sign in to start building a private RepoPilot workspace with saved
-              analyses, ownership checks, and user-scoped usage limits.
-            </div>
-          )}
 
           {isSignedIn ? (
             <div className="mx-auto mt-10 flex max-w-3xl flex-col gap-4 sm:flex-row">
