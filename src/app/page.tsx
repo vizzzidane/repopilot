@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import MermaidDiagram from "@/components/MermaidDiagram";
@@ -64,6 +64,10 @@ export default function HomePage() {
   const [indexedFilesOpen, setIndexedFilesOpen] = useState(false);
 
   const answerRef = useRef<HTMLDivElement | null>(null);
+
+  function goToSignIn() {
+    window.location.href = "/sign-in";
+  }
 
   function getGitHubFileUrl(path: string) {
     if (!analysis?.repoHtmlUrl || !analysis?.defaultBranch) return "#";
@@ -195,14 +199,6 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {!isSignedIn && (
-              <SignInButton mode="modal">
-                <button className="rounded-full border border-white/10 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-zinc-200">
-                  Sign in
-                </button>
-              </SignInButton>
-            )}
-
             {isSignedIn && (
               <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2">
                 <span className="hidden text-xs text-zinc-400 sm:inline">
@@ -255,11 +251,12 @@ export default function HomePage() {
                 Sign in to analyze repositories, save your history, and ask repo-specific questions.
               </p>
 
-              <SignInButton mode="modal">
-                <button className="mt-4 rounded-2xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200">
-                  Sign in to continue
-                </button>
-              </SignInButton>
+              <button
+                onClick={goToSignIn}
+                className="mt-4 rounded-2xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-zinc-200"
+              >
+                Sign in to continue
+              </button>
             </div>
           )}
 
