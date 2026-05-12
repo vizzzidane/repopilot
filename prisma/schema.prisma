@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Analysis {
+  id            String   @id
+  userId        String
+  repoOwner     String
+  repoNameRaw   String
+  repoHtmlUrl   String
+  defaultBranch String
+  sourceFiles   Json
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([repoOwner, repoNameRaw])
+}
