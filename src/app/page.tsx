@@ -25,6 +25,74 @@ const CHAT_LOADING_STEPS = [
 
 const MAX_MERMAID_CHARS = 4000;
 
+const LOCAL_ANALYSIS_CACHE_KEY = "repopilot:analysis-cache";
+const MAX_LOCAL_ANALYSIS_CACHE_ITEMS = 20;
+
+type CachedAnalysisSnapshot = {
+  analysisId: string;
+  createdAt: string;
+  analysis: any;
+};
+
+function readLocalAnalysisCache(): CachedAnalysisSnapshot[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LOCAL_ANALYSIS_CACHE_KEY);
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (item): item is CachedAnalysisSnapshot =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.analysisId === "string" &&
+        typeof item.createdAt === "string" &&
+        "analysis" in item
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalAnalysisSnapshot(analysis: any) {
+  if (typeof window === "undefined" || !analysis?.analysisId) {
+    return;
+  }
+
+  const existing = readLocalAnalysisCache();
+
+  const updated = [
+    {
+      analysisId: analysis.analysisId,
+      createdAt: new Date().toISOString(),
+      analysis,
+    },
+    ...existing.filter((item) => item.analysisId !== analysis.analysisId),
+  ].slice(0, MAX_LOCAL_ANALYSIS_CACHE_ITEMS);
+
+  window.localStorage.setItem(
+    LOCAL_ANALYSIS_CACHE_KEY,
+    JSON.stringify(updated)
+  );
+}
+
+function getLocalAnalysisSnapshot(analysisId: string) {
+  return readLocalAnalysisCache().find(
+    (item) => item.analysisId === analysisId
+  );
+}
+
 function sanitizeMermaidDiagram(input: unknown) {
   if (typeof input !== "string") {
     return "";
@@ -63,6 +131,7 @@ export default function HomePage() {
   const [chatAnswer, setChatAnswer] = useState("");
   const [chatMermaidDiagram, setChatMermaidDiagram] = useState("");
   const [indexedFilesOpen, setIndexedFilesOpen] = useState(false);
+  const [historyLoadingId, setHistoryLoadingId] = useState("");
 
   const answerRef = useRef<HTMLDivElement | null>(null);
 
@@ -117,11 +186,66 @@ export default function HomePage() {
       }
 
       setAnalysis(data);
+      saveLocalAnalysisSnapshot(data);
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {
       clearInterval(loadingInterval);
       setLoading(false);
+    }
+  }
+
+  async function openHistoryAnalysis(analysisId: string) {
+    const cached = getLocalAnalysisSnapshot(analysisId);
+
+    setError("");
+    setChatAnswer("");
+    setChatMermaidDiagram("");
+    setQuestion("");
+    setIndexedFilesOpen(false);
+
+    if (cached) {
+      setAnalysis(cached.analysis);
+
+      setTimeout(() => {
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }, 50);
+
+      return;
+    }
+
+    try {
+      setHistoryLoadingId(analysisId);
+
+      const res = await fetch(`/api/history/${analysisId}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load saved analysis.");
+      }
+
+      setAnalysis(data);
+      saveLocalAnalysisSnapshot(data);
+
+      setTimeout(() => {
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }, 50);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load saved analysis."
+      );
+    } finally {
+      setHistoryLoadingId("");
     }
   }
 
@@ -820,7 +944,13 @@ export default function HomePage() {
       </div>
 
       <div className="mx-auto mt-10 w-full max-w-6xl">
-        {isSignedIn && <HistoryPanel />}
+        {isSignedIn && (
+          <HistoryPanel
+            activeAnalysisId={analysis?.analysisId}
+            loadingAnalysisId={historyLoadingId}
+            onSelect={openHistoryAnalysis}
+          />
+        )}
       </div>
     </main>
   );
