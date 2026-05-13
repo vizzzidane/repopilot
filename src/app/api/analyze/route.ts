@@ -6,7 +6,7 @@ import {
   createAnalysisId,
   storeAnalysis,
 } from "@/lib/analysisStore";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "../../../../auth";
 import {
   getCachedRepoAnalysis,
   setCachedRepoAnalysis,
@@ -470,7 +470,8 @@ export async function POST(req: NextRequest) {
   const requestId = createRequestId();
 
   try {
-        const { userId } = await auth();
+    const session = await auth();
+    const userId = session?.user?.id;
 
     if (!userId) {
       return NextResponse.json(

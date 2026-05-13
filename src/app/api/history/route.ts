@@ -1,39 +1,38 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "../../../../auth";
 import { getUserAnalysesFromDb } from "@/lib/analysisDb";
 
 export async function GET() {
   try {
-    const { userId } = await auth();
+    const session = await auth();
+    const userId = session?.user?.id;
 
     if (!userId) {
       return NextResponse.json(
-        {
-          error: "Authentication required.",
-        },
+        { error: "Authentication required." },
         { status: 401 }
       );
     }
 
     const analyses = await getUserAnalysesFromDb(userId);
 
-    const history = analyses.map((analysis: {
+    const history = analyses.map(
+      (analysis: {
         id: string;
         repoOwner: string;
         repoNameRaw: string;
         repoHtmlUrl: string;
         createdAt: Date;
-        }) => ({
-            analysisId: analysis.id,
-            repoOwner: analysis.repoOwner,
-            repoNameRaw: analysis.repoNameRaw,
-            repoHtmlUrl: analysis.repoHtmlUrl,
-            createdAt: analysis.createdAt.toISOString(),
-        }));
+      }) => ({
+        analysisId: analysis.id,
+        repoOwner: analysis.repoOwner,
+        repoNameRaw: analysis.repoNameRaw,
+        repoHtmlUrl: analysis.repoHtmlUrl,
+        createdAt: analysis.createdAt.toISOString(),
+      })
+    );
 
-    return NextResponse.json({
-      history,
-    });
+    return NextResponse.json({ history });
   } catch (error) {
     return NextResponse.json(
       {

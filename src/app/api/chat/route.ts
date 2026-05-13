@@ -5,7 +5,7 @@ import { getAnalysis } from "@/lib/analysisStore";
 import { ChatResponseSchema } from "@/lib/aiSchemas";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "../../../../auth";
 import { getAnalysisFromDb } from "@/lib/analysisDb";
 
 type SourceFile = {
@@ -95,7 +95,8 @@ export async function POST(req: NextRequest) {
   const requestId = createRequestId();
 
   try {
-        const { userId } = await auth();
+    const session = await auth();
+    const userId = session?.user?.id;
 
     if (!userId) {
       return NextResponse.json(
@@ -148,45 +149,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-   const redisAnalysis = await getAnalysis(analysisId);
-const dbAnalysis = redisAnalysis ? null : await getAnalysisFromDb(analysisId);
+    const redisAnalysis = await getAnalysis(analysisId);
+    const dbAnalysis = redisAnalysis ? null : await getAnalysisFromDb(analysisId);
 
-const analysis = redisAnalysis ?? dbAnalysis;
+    const analysis = redisAnalysis ?? dbAnalysis;
 
-if (!analysis) {
-  return NextResponse.json(
-    {
-      error:
-        "Analysis session expired or not found. Please analyze the repository again.",
-    },
-    { status: 404 }
-  );
-}
+    if (!analysis) {
+      return NextResponse.json(
+        {
+          error:
+            "Analysis session expired or not found. Please analyze the repository again.",
+        },
+        { status: 404 }
+      );
+    }
 
-if (analysis.userId !== userId) {
-  return NextResponse.json(
-    {
-      error: "You do not have access to this analysis session.",
-    },
-    { status: 403 }
-  );
-}
+    if (analysis.userId !== userId) {
+      return NextResponse.json(
+        {
+          error: "You do not have access to this analysis session.",
+        },
+        { status: 403 }
+      );
+    }
 
-const rawSourceFiles: unknown[] = Array.isArray(analysis.sourceFiles)
-  ? analysis.sourceFiles
-  : [];
+    const rawSourceFiles: unknown[] = Array.isArray(analysis.sourceFiles)
+      ? analysis.sourceFiles
+      : [];
 
-const selectedFiles = cleanSourceFiles(
-  rawSourceFiles.filter(
-    (file): file is SourceFile =>
-      typeof file === "object" &&
-      file !== null &&
-      "path" in file &&
-      "content" in file &&
-      typeof (file as { path?: unknown }).path === "string" &&
-      typeof (file as { content?: unknown }).content === "string"
-  )
-);
+    const selectedFiles = cleanSourceFiles(
+      rawSourceFiles.filter(
+        (file): file is SourceFile =>
+          typeof file === "object" &&
+          file !== null &&
+          "path" in file &&
+          "content" in file &&
+          typeof (file as { path?: unknown }).path === "string" &&
+          typeof (file as { content?: unknown }).content === "string"
+      )
+    );
     const repoContext = buildRepoContext(selectedFiles);
 
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {

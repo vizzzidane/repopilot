@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { signIn, signOut, useSession } from "next-auth/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import MermaidDiagram from "@/components/MermaidDiagram";
@@ -50,7 +50,8 @@ function sanitizeMermaidDiagram(input: unknown) {
 }
 
 export default function HomePage() {
-  const { isSignedIn } = useUser();
+  const { data: session, status } = useSession();
+  const isSignedIn = status === "authenticated";
   const [repoUrl, setRepoUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -66,7 +67,7 @@ export default function HomePage() {
   const answerRef = useRef<HTMLDivElement | null>(null);
 
   function goToSignIn() {
-    window.location.href = "/sign-in";
+    signIn("github", { redirectTo: "/" });
   }
 
   function getGitHubFileUrl(path: string) {
@@ -199,12 +200,26 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {!isSignedIn && (
+              <button
+                onClick={goToSignIn}
+                className="rounded-full border border-white/10 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-zinc-200"
+              >
+                Sign in
+              </button>
+            )}
+
             {isSignedIn && (
               <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2">
                 <span className="hidden text-xs text-zinc-400 sm:inline">
-                  Signed in
+                  {session?.user?.email || session?.user?.name || "Signed in"}
                 </span>
-                <UserButton />
+                <button
+                  onClick={() => signOut({ redirectTo: "/" })}
+                  className="text-xs text-zinc-300 transition hover:text-white"
+                >
+                  Sign out
+                </button>
               </div>
             )}
           </div>
