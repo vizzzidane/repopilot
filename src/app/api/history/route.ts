@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../auth";
 import { getUserAnalysesFromDb } from "@/lib/analysisDb";
+import { createRequestId } from "@/lib/requestId";
 
 export async function GET() {
+  const requestId = createRequestId();
+
   try {
     const session = await auth();
     const userId = session?.user?.id;
@@ -16,30 +19,26 @@ export async function GET() {
 
     const analyses = await getUserAnalysesFromDb(userId);
 
-    const history = analyses.map(
-      (analysis: {
-        id: string;
-        repoOwner: string;
-        repoNameRaw: string;
-        repoHtmlUrl: string;
-        createdAt: Date;
-      }) => ({
-        analysisId: analysis.id,
-        repoOwner: analysis.repoOwner,
-        repoNameRaw: analysis.repoNameRaw,
-        repoHtmlUrl: analysis.repoHtmlUrl,
-        createdAt: analysis.createdAt.toISOString(),
-      })
-    );
+    const history = analyses.map((analysis) => ({
+      analysisId: analysis.id,
+      repoOwner: analysis.repoOwner,
+      repoNameRaw: analysis.repoNameRaw,
+      repoHtmlUrl: analysis.repoHtmlUrl,
+      createdAt: analysis.createdAt.toISOString(),
+    }));
 
     return NextResponse.json({ history });
   } catch (error) {
+    console.error({
+      requestId,
+      route: "/api/history",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch analysis history",
+        requestId,
+        error: "Failed to fetch analysis history.",
       },
       { status: 500 }
     );

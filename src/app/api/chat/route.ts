@@ -96,16 +96,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const session = await auth();
-    const userId = session?.user?.id;
 
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error: "Authentication required.",
-        },
-        { status: 401 }
-      );
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const userId = session.user.id;
     const rateLimitResponse = await checkChatRateLimit(req);
 
     if (rateLimitResponse) {
@@ -150,8 +146,9 @@ export async function POST(req: NextRequest) {
     }
 
     const redisAnalysis = await getAnalysis(analysisId);
-    const dbAnalysis = redisAnalysis ? null : await getAnalysisFromDb(analysisId);
-
+    const dbAnalysis = redisAnalysis
+      ? null
+      : await getAnalysisFromDb(analysisId, userId);
     const analysis = redisAnalysis ?? dbAnalysis;
 
     if (!analysis) {
@@ -366,10 +363,7 @@ Rules:
     return NextResponse.json(
       {
         requestId,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Something went wrong while answering the repo question",
+        error: "Something went wrong while answering the repo question.",
       },
       { status: 500 }
     );

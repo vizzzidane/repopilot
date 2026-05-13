@@ -59,10 +59,11 @@ export async function getUserAnalysesFromDb(userId: string) {
   });
 }
 
-export async function getAnalysisFromDb(analysisId: string) {
-  return prisma.analysis.findUnique({
+export async function getAnalysisFromDb(analysisId: string, userId: string) {
+  return prisma.analysis.findFirst({
     where: {
       id: analysisId,
+      userId,
     },
   });
 }

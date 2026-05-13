@@ -3,9 +3,14 @@ import { z } from "zod";
 import type { StoredSourceFile } from "@/lib/analysisStore";
 import { AnalyzeResponseSchema } from "@/lib/aiSchemas";
 
+const REPO_CACHE_TTL_SECONDS = 60 * 60 * 3;
+const MAX_CACHED_SOURCE_FILES = 16;
+const MAX_CACHED_FILE_CHARS = 2500;
+const MAX_CACHED_TOTAL_SOURCE_CHARS = 50000;
+
 const CachedSourceFileSchema = z.object({
   path: z.string().min(1).max(500),
-  content: z.string().max(2500),
+  content: z.string().max(MAX_CACHED_FILE_CHARS),
 });
 
 const CachedRepoResponseSchema = AnalyzeResponseSchema.extend({
@@ -41,34 +46,44 @@ const redis =
     ? Redis.fromEnv()
     : null;
 
-const REPO_CACHE_TTL_SECONDS = 60 * 60 * 3;
-const MAX_CACHED_SOURCE_FILES = 16;
-const MAX_CACHED_TOTAL_SOURCE_CHARS = 50000;
+function normalizeCachePart(value: string) {
+  return value.trim().toLowerCase();
+}
 
 function getRepoCacheKey(owner: string, repo: string) {
-  return `repopilot:repo-cache:${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  const normalizedOwner = normalizeCachePart(owner);
+  const normalizedRepo = normalizeCachePart(repo);
+
+  return `repopilot:repo-cache:${normalizedOwner}/${normalizedRepo}`;
+}
+
+function sanitizeCachedText(value: string) {
+  return value.replace(/\u0000/g, "");
 }
 
 function trimSourceFiles(sourceFiles: StoredSourceFile[]) {
-  const trimmedFiles = sourceFiles
-    .slice(0, MAX_CACHED_SOURCE_FILES)
-    .map((file) => ({
-      path: file.path,
-      content: file.content.slice(0, 2500),
-    }));
-
   let totalChars = 0;
   const boundedFiles: StoredSourceFile[] = [];
 
-  for (const file of trimmedFiles) {
-    const nextTotal = totalChars + file.content.length;
+  for (const file of sourceFiles.slice(0, MAX_CACHED_SOURCE_FILES)) {
+    const safePath = sanitizeCachedText(file.path).slice(0, 500);
+    const safeContent = sanitizeCachedText(file.content).slice(
+      0,
+      MAX_CACHED_FILE_CHARS
+    );
+
+    const nextTotal = totalChars + safeContent.length;
 
     if (nextTotal > MAX_CACHED_TOTAL_SOURCE_CHARS) {
       break;
     }
 
+    boundedFiles.push({
+      path: safePath,
+      content: safeContent,
+    });
+
     totalChars = nextTotal;
-    boundedFiles.push(file);
   }
 
   return boundedFiles;
@@ -114,7 +129,9 @@ export async function setCachedRepoAnalysis(
     createdAt: new Date().toISOString(),
   };
 
-  await redis.set(getRepoCacheKey(owner, repo), payload, {
+  const parsed = CachedRepoAnalysisSchema.parse(payload);
+
+  await redis.set(getRepoCacheKey(owner, repo), parsed, {
     ex: REPO_CACHE_TTL_SECONDS,
   });
 }

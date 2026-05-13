@@ -1,3 +1,5 @@
+import { validateGithubRepoUrl } from "@/lib/github-url";
+import { REPO_LIMITS, shouldSkipRepoFile } from "@/lib/repo-limits";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkAnalyzeRateLimit } from "@/lib/rateLimit";
@@ -11,7 +13,6 @@ import {
   getCachedRepoAnalysis,
   setCachedRepoAnalysis,
 } from "@/lib/repoCache";
-import { validateGitHubRepoUrl } from "@/lib/github/validateRepo";
 import { isBlockedFilePath } from "@/lib/security/blockedFiles";
 import { redactSecrets } from "@/lib/security/secretScan";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
@@ -33,12 +34,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const MAX_FILES_FOR_ANALYSIS = 16;
 const MAX_CHARS_PER_FILE_FOR_LLM = 2200;
-const MAX_FILE_SIZE_BYTES = 40000;
 const MAX_REPO_TREE_ITEMS = 5000;
 const MAX_REPO_URL_LENGTH = 200;
-const MAX_TOTAL_LLM_CONTEXT_CHARS = 50000;
 
 const FETCH_TIMEOUT_MS = 15000;
 
@@ -258,7 +256,7 @@ function selectImportantFiles(files: GitHubTreeItem[]) {
   const blobs = files.filter(
     (file) =>
       file.type === "blob" &&
-      (file.size ?? 0) <= MAX_FILE_SIZE_BYTES &&
+      (file.size ?? 0) <= REPO_LIMITS.maxFileSizeBytes &&
       !shouldExcludeFile(file.path)
   );
 
@@ -270,7 +268,7 @@ function selectImportantFiles(files: GitHubTreeItem[]) {
     .filter((file) => file.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  return scored.slice(0, MAX_FILES_FOR_ANALYSIS);
+  return scored.slice(0, REPO_LIMITS.maxFiles);
 }
 
 async function fetchRawFile(
@@ -488,7 +486,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const repoUrl = body.repoUrl;
+
+    const validatedRepo = validateGithubRepoUrl(body.repoUrl);
+    const repoUrl = validatedRepo.normalizedUrl;
 
     if (!repoUrl || typeof repoUrl !== "string") {
       return NextResponse.json(
@@ -504,7 +504,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { owner, repo } = validateGitHubRepoUrl(repoUrl);
+    const { owner, repo } = validatedRepo;
 
     const cached = await getCachedRepoAnalysis(owner, repo);
 
@@ -595,26 +595,43 @@ export async function POST(req: NextRequest) {
       )
     );
 
-    const selectedFilesForLLM = sanitizeSelectedFilesForLLM(
+    const initialFilesForLLM = sanitizeSelectedFilesForLLM(
       selectedFiles.map((file, index) => ({
         path: file.path,
         content: fileContents[index],
       }))
     );
 
-    const totalContextChars = selectedFilesForLLM.reduce(
+    const safeFiles = initialFilesForLLM
+      .filter((file) => !shouldSkipRepoFile(file.path))
+      .filter((file) => file.content.length <= REPO_LIMITS.maxFileSizeBytes)
+      .slice(0, REPO_LIMITS.maxFiles);
+
+    let totalChars = 0;
+    const cappedFiles: SelectedFile[] = [];
+
+    for (const file of safeFiles) {
+      if (totalChars + file.content.length > REPO_LIMITS.maxTotalChars) {
+        break;
+      }
+
+      cappedFiles.push(file);
+      totalChars += file.content.length;
+    }
+
+    const totalContextChars = cappedFiles.reduce(
       (sum, file) => sum + file.content.length,
       0
     );
 
-    if (totalContextChars > MAX_TOTAL_LLM_CONTEXT_CHARS) {
+    if (totalContextChars > REPO_LIMITS.maxTotalChars) {
       throw new Error("Repository context is too large to analyse safely.");
     }
 
     const aiAnalysis = await analyzeWithOpenAI({
       repoName: repoInfo.name,
       repoDescription: repoInfo.description || "",
-      selectedFiles: selectedFilesForLLM,
+      selectedFiles: cappedFiles,
     });
 
     const analysisId = createAnalysisId();
@@ -625,7 +642,7 @@ export async function POST(req: NextRequest) {
       repoNameRaw: repo,
       repoHtmlUrl: repoInfo.html_url,
       defaultBranch,
-      sourceFiles: selectedFilesForLLM,
+      sourceFiles: cappedFiles,
       createdAt: new Date().toISOString(),
     });
 
@@ -639,7 +656,7 @@ export async function POST(req: NextRequest) {
       repoHtmlUrl: repoInfo.html_url,
       defaultBranch,
 
-      sourceFiles: selectedFilesForLLM,
+      sourceFiles: cappedFiles,
 
       createdAt: new Date().toISOString(),
     });
@@ -664,11 +681,11 @@ export async function POST(req: NextRequest) {
       repoLanguage: repoInfo.language,
       repoSizeKb: repoInfo.size,
 
-      indexedFiles: selectedFilesForLLM.map((file) => ({
+      indexedFiles: cappedFiles.map((file) => ({
         path: file.path,
       })),
 
-      analyzedFileCount: selectedFilesForLLM.length,
+      analyzedFileCount: cappedFiles.length,
 
       indexingStrategy:
         "Secure server-side repository indexing with Redis-backed context storage.",
@@ -678,7 +695,7 @@ export async function POST(req: NextRequest) {
       owner,
       repo,
       responsePayload,
-      selectedFilesForLLM
+      cappedFiles
     );
 
     return NextResponse.json({
@@ -696,10 +713,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         requestId,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Something went wrong while analysing the repository",
+        error: "Something went wrong while analysing the repository.",
       },
       { status: 500 }
     );
