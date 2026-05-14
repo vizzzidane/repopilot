@@ -32,6 +32,9 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
+      - name: Run tests
+        run: npm run test
+
       - name: Build application
         run: npm run build
         env:
