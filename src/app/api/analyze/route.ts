@@ -758,6 +758,23 @@ export async function POST(req: NextRequest) {
     const cached = await getCachedRepoAnalysis(owner, repo);
 
     if (cached?.response && cached?.sourceFiles) {
+      const cachedSafeFiles = sanitizeSelectedFilesForLLM(cached.sourceFiles)
+        .filter((file) => !shouldSkipRepoFile(file.path))
+        .filter((file) => file.content.length <= REPO_LIMITS.maxFileSizeBytes)
+        .slice(0, REPO_LIMITS.maxFiles);
+
+      let cachedTotalChars = 0;
+      const cachedCappedFiles: SelectedFile[] = [];
+
+      for (const file of cachedSafeFiles) {
+        if (cachedTotalChars + file.content.length > REPO_LIMITS.maxTotalChars) {
+          break;
+        }
+
+        cachedCappedFiles.push(file);
+        cachedTotalChars += file.content.length;
+      }
+
       const analysisId = createAnalysisId();
 
       await storeAnalysis(analysisId, {
@@ -766,7 +783,7 @@ export async function POST(req: NextRequest) {
         repoNameRaw: repo,
         repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
         defaultBranch: (cached.response.defaultBranch as string) || "main",
-        sourceFiles: sanitizeSelectedFilesForLLM(cached.sourceFiles),
+        sourceFiles: cachedCappedFiles,
         createdAt: new Date().toISOString(),
       });
 
@@ -780,7 +797,7 @@ export async function POST(req: NextRequest) {
         repoHtmlUrl: (cached.response.repoHtmlUrl as string) || "",
         defaultBranch: (cached.response.defaultBranch as string) || "main",
 
-        sourceFiles: sanitizeSelectedFilesForLLM(cached.sourceFiles),
+        sourceFiles: cachedCappedFiles,
 
         createdAt: new Date().toISOString(),
       });
@@ -796,6 +813,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         analysisId,
         ...cached.response,
+        analyzedFileCount: cachedCappedFiles.length,
+        partialAnalysis:
+          Boolean(cached.response.partialAnalysis) ||
+          cachedCappedFiles.length !== cached.sourceFiles.length,
+        analysisWarnings:
+          cachedCappedFiles.length !== cached.sourceFiles.length
+            ? [
+                "Cached repository analysis was safely capped to stay within file and context limits.",
+              ]
+            : cached.response.analysisWarnings,
         cacheHit: true,
       });
     }
