@@ -18,6 +18,10 @@ import { redactSecrets } from "@/lib/security/secretScan";
 import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
 import { saveAnalysisToDb } from "@/lib/analysisDb";
+import {
+  hasPromptInjectionSignal,
+  redactPromptInjectionText,
+} from "@/lib/security/promptInjection";
 
 type GitHubTreeItem = {
   path: string;
@@ -442,9 +446,17 @@ function sanitizeSelectedFilesForLLM(files: SelectedFile[]) {
       });
     }
 
+    const promptSafeContent = redactPromptInjectionText(redactedContent);
+
+    if (hasPromptInjectionSignal(redactedContent)) {
+      console.warn("Prompt-injection-like content redacted before LLM ingestion", {
+        filePath: file.path,
+      });
+    }
+
     return {
       ...file,
-      content: redactedContent,
+      content: promptSafeContent,
       imports: file.imports,
     };
   });
