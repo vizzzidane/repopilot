@@ -39,6 +39,12 @@ type ChatMessage = {
   content: string;
 };
 
+type RetrievalMetadata = {
+  fallbackUsed: boolean;
+  chunksUsed: number;
+  filesUsed: string[];
+};
+
 function readLocalAnalysisCache(): CachedAnalysisSnapshot[] {
   if (typeof window === "undefined") {
     return [];
@@ -137,6 +143,7 @@ export default function HomePage() {
   const [chatAnswer, setChatAnswer] = useState("");
   const [chatMermaidDiagram, setChatMermaidDiagram] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [retrievalMetadata, setRetrievalMetadata] = useState<RetrievalMetadata | null>(null);
   const [indexedFilesOpen, setIndexedFilesOpen] = useState(false);
   const [historyLoadingId, setHistoryLoadingId] = useState("");
 
@@ -182,6 +189,7 @@ export default function HomePage() {
     setChatMermaidDiagram("");
     setQuestion("");
     setChatHistory([]);
+    setRetrievalMetadata(null);
     setIndexedFilesOpen(false);
 
     const loadingInterval = setInterval(() => {
@@ -227,6 +235,7 @@ export default function HomePage() {
     setChatMermaidDiagram("");
     setQuestion("");
     setChatHistory([]);
+    setRetrievalMetadata(null);
     setIndexedFilesOpen(false);
 
     if (cached) {
@@ -281,6 +290,7 @@ export default function HomePage() {
     setChatLoadingStep(0);
     setChatAnswer("");
     setChatMermaidDiagram("");
+    setRetrievalMetadata(null);
 
     const chatInterval = setInterval(() => {
       setChatLoadingStep((prev) =>
@@ -308,6 +318,7 @@ export default function HomePage() {
       const assistantAnswer = data.answerMarkdown || data.answer || "";
       setChatAnswer(assistantAnswer);
       setChatMermaidDiagram(sanitizeMermaidDiagram(data.mermaidDiagram));
+      setRetrievalMetadata(data.retrieval ?? null);
 
       setChatHistory((previous): ChatMessage[] =>
         [
@@ -1249,6 +1260,34 @@ ${
                   >
                     {chatAnswer}
                   </ReactMarkdown>
+
+                  {retrievalMetadata && (
+                    <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-zinc-400">
+                      <p className="font-medium text-zinc-300">
+                        Grounded in {retrievalMetadata.chunksUsed} retrieved chunks from{" "}
+                        {new Set(retrievalMetadata.filesUsed.map((file) => file.split("#")[0]))
+                          .size}{" "}
+                        files
+                        {retrievalMetadata.fallbackUsed ? " · fallback retrieval used" : ""}
+                      </p>
+
+                      {retrievalMetadata.filesUsed.length > 0 && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-zinc-500 hover:text-zinc-300">
+                            Files used
+                          </summary>
+
+                          <ul className="mt-2 space-y-1">
+                            {retrievalMetadata.filesUsed.slice(0, 8).map((file) => (
+                              <li key={file} className="break-all font-mono text-[11px]">
+                                {file}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
