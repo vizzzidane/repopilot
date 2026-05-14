@@ -679,15 +679,53 @@ export default function HomePage() {
                 {analysis.architectureExplanation}
               </p>
 
-              {safeArchitectureDiagram && (
-                <div className="mt-6">
-                  <h3 className="mb-3 text-lg font-medium text-white">
-                    Architecture Diagram
-                  </h3>
+              <div className="mt-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      Repository Architecture
+                    </h3>
 
-                  <MermaidDiagram chart={safeArchitectureDiagram} />
+                    <div className="mt-1 text-sm text-zinc-400">
+                      High-level execution and dependency flow inferred from the analyzed repository files.
+                    </div>
+                  </div>
+
+                  <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-zinc-400">
+                    AI Generated
+                  </div>
                 </div>
-              )}
+
+                {safeArchitectureDiagram ? (
+                  <>
+                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0B1020] p-4">
+                      <MermaidDiagram chart={safeArchitectureDiagram} />
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <span className="rounded-full border border-white/10 px-2 py-1">
+                        Mermaid Diagram
+                      </span>
+
+                      {typeof analysis?.analyzedFileCount === "number" && (
+                        <span className="rounded-full border border-white/10 px-2 py-1">
+                          {analysis.analyzedFileCount} files analyzed
+                        </span>
+                      )}
+
+                      {analysis?.partialAnalysis && (
+                        <span className="rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-yellow-200">
+                          Partial analysis
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-6 text-sm text-zinc-500">
+                    RepoPilot could not confidently infer a repository-wide architecture graph from the selected files.
+                  </div>
+                )}
+              </div>
             </div>
 
             {analysis.keyFiles?.length > 0 && (
