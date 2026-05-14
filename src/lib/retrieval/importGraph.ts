@@ -1,3 +1,5 @@
+import path from "node:path";
+
 export type ImportGraphFile = {
   path: string;
   content: string;
@@ -39,12 +41,14 @@ const IMPORT_PATTERNS = [
   /import\(\s*["']([^"']+)["']\s*\)/g,
 ];
 
-function normalizePath(path: string) {
-  return path.replaceAll("\\", "/").replace(/^\.?\//, "");
+function normalizePath(filePath: string) {
+  return path.posix
+    .normalize(filePath.replaceAll("\\", "/"))
+    .replace(/^\.?\//, "");
 }
 
-function getDirectory(path: string) {
-  const normalized = normalizePath(path);
+function getDirectory(filePath: string) {
+  const normalized = normalizePath(filePath);
   const lastSlashIndex = normalized.lastIndexOf("/");
 
   if (lastSlashIndex === -1) {
@@ -55,7 +59,12 @@ function getDirectory(path: string) {
 }
 
 function isRelativeImport(importPath: string) {
-  return importPath.startsWith("./") || importPath.startsWith("../");
+  const normalizedImportPath = importPath.replaceAll("\\", "/");
+
+  return (
+    normalizedImportPath.startsWith("./") ||
+    normalizedImportPath.startsWith("../")
+  );
 }
 
 function isAliasImport(importPath: string) {
@@ -71,8 +80,8 @@ function getExternalPackageName(importPath: string) {
   return importPath.split("/")[0];
 }
 
-function stripKnownExtension(path: string) {
-  return path.replace(/\.(tsx|ts|jsx|js|json|css|scss|mdx|md)$/i, "");
+function stripKnownExtension(filePath: string) {
+  return filePath.replace(/\.(tsx|ts|jsx|js|json|css|scss|mdx|md)$/i, "");
 }
 
 function resolveInternalImport(
@@ -85,7 +94,9 @@ function resolveInternalImport(
 
   const basePath = isAliasImport(normalizedImport)
     ? normalizePath(normalizedImport.replace(/^@\//, "src/"))
-    : normalizePath(`${getDirectory(normalizedFromFile)}/${normalizedImport}`);
+    : normalizePath(
+        path.posix.join(getDirectory(normalizedFromFile), normalizedImport),
+      );
 
   const candidates = [
     basePath,
@@ -121,8 +132,8 @@ function extractImports(content: string) {
   return [...imports];
 }
 
-function isEntrypoint(path: string) {
-  return ENTRYPOINT_PATTERNS.some((pattern) => pattern.test(path));
+function isEntrypoint(filePath: string) {
+  return ENTRYPOINT_PATTERNS.some((pattern) => pattern.test(filePath));
 }
 
 export function buildImportGraph(files: ImportGraphFile[]): ImportGraph {
@@ -175,7 +186,7 @@ export function buildImportGraph(files: ImportGraphFile[]): ImportGraph {
     edges,
     entrypoints: normalizedFiles
       .map((file) => file.path)
-      .filter((path) => isEntrypoint(path)),
+      .filter((filePath) => isEntrypoint(filePath)),
     externalPackages: [...externalPackages].sort(),
   };
 }
