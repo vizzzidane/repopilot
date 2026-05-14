@@ -461,6 +461,28 @@ export default function HomePage() {
 
         {analysis && (
           <section className="mt-16 space-y-8">
+            {Array.isArray(analysis?.analysisWarnings) &&
+              analysis.analysisWarnings.length > 0 && (
+                <div className="mb-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+                  <div className="text-sm font-semibold text-yellow-200">
+                    Partial Repository Analysis
+                  </div>
+
+                  <div className="mt-2 space-y-1">
+                    {analysis.analysisWarnings.map(
+                      (warning: string, index: number) => (
+                        <div
+                          key={`${warning}-${index}`}
+                          className="text-sm text-yellow-100/90"
+                        >
+                          • {warning}
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
             <div className="rounded-3xl border border-white/10 bg-zinc-950 p-8">
               <div className="mb-4 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-wide text-zinc-400">
                 Repository Summary
@@ -528,6 +550,11 @@ export default function HomePage() {
                   <p className="mt-2 text-lg font-semibold text-white">
                     {formatRepoSize(analysis.repoSizeKb)}
                   </p>
+                  {typeof analysis?.analyzedFileCount === "number" && (
+                    <div className="text-xs text-zinc-500">
+                      Analyzed files: {analysis.analyzedFileCount}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -565,6 +592,11 @@ export default function HomePage() {
                       These are the files RepoPilot selected and used as
                       grounding context for the analysis.
                     </p>
+                    {analysis?.indexingStrategy && (
+                      <div className="mt-3 text-xs text-zinc-500">
+                        {analysis.indexingStrategy}
+                      </div>
+                    )}
                   </div>
 
                   <button
