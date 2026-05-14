@@ -252,23 +252,103 @@ function scoreFile(path: string, size = 0) {
   return score;
 }
 
-function selectImportantFiles(files: GitHubTreeItem[]) {
-  const blobs = files.filter(
-    (file) =>
-      file.type === "blob" &&
-      (file.size ?? 0) <= REPO_LIMITS.maxFileSizeBytes &&
-      !shouldExcludeFile(file.path)
-  );
+function getFileImportanceScore(path: string) {
+  const normalized = path.toLowerCase();
 
-  const scored = blobs
-    .map((file) => ({
-      ...file,
-      score: scoreFile(file.path, file.size ?? 0),
+  let score = 0;
+
+  // Core app entrypoints
+  if (
+    normalized.includes("main.") ||
+    normalized.includes("index.") ||
+    normalized.includes("app.") ||
+    normalized.includes("server.") ||
+    normalized.includes("client.") ||
+    normalized.includes("api/")
+  ) {
+    score += 100;
+  }
+
+  // Architecture-critical files
+  if (
+    normalized.includes("router") ||
+    normalized.includes("service") ||
+    normalized.includes("controller") ||
+    normalized.includes("provider") ||
+    normalized.includes("store") ||
+    normalized.includes("config") ||
+    normalized.includes("schema") ||
+    normalized.includes("model")
+  ) {
+    score += 80;
+  }
+
+  // Framework structure
+  if (
+    normalized.includes("src/") ||
+    normalized.includes("app/") ||
+    normalized.includes("pages/") ||
+    normalized.includes("components/")
+  ) {
+    score += 40;
+  }
+
+  // Documentation
+  if (
+    normalized.endsWith("readme.md") ||
+    normalized.endsWith("architecture.md")
+  ) {
+    score += 60;
+  }
+
+  // Important code extensions
+  if (
+    normalized.endsWith(".ts") ||
+    normalized.endsWith(".tsx") ||
+    normalized.endsWith(".js") ||
+    normalized.endsWith(".jsx") ||
+    normalized.endsWith(".py")
+  ) {
+    score += 30;
+  }
+
+  // Penalize test/generated files
+  if (
+    normalized.includes(".test.") ||
+    normalized.includes(".spec.") ||
+    normalized.includes("__tests__") ||
+    normalized.includes("node_modules") ||
+    normalized.includes("dist/") ||
+    normalized.includes("build/")
+  ) {
+    score -= 100;
+  }
+
+  return score;
+}
+
+function selectImportantFiles(tree: GitHubTreeItem[]) {
+  const ranked = tree
+    .filter((item) => item.type === "blob")
+    .filter((item) => item.path)
+    .map((item) => ({
+      ...item,
+      importanceScore: getFileImportanceScore(item.path),
     }))
-    .filter((file) => file.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.importanceScore - a.importanceScore);
 
-  return scored.slice(0, REPO_LIMITS.maxFiles);
+  const uniquePaths = new Set<string>();
+
+  const selected = ranked.filter((item) => {
+    if (uniquePaths.has(item.path)) {
+      return false;
+    }
+
+    uniquePaths.add(item.path);
+    return true;
+  });
+
+  return selected.slice(0, 40);
 }
 
 async function fetchRawFile(
