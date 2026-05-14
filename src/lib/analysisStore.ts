@@ -4,6 +4,7 @@ import { z } from "zod";
 export type StoredSourceFile = {
   path: string;
   content: string;
+  imports?: string[];
 };
 
 export type StoredAnalysis = {

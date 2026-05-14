@@ -7,10 +7,12 @@ const REPO_CACHE_TTL_SECONDS = 60 * 60 * 3;
 const MAX_CACHED_SOURCE_FILES = 16;
 const MAX_CACHED_FILE_CHARS = 2500;
 const MAX_CACHED_TOTAL_SOURCE_CHARS = 50000;
+const MAX_CACHED_IMPORTS_PER_FILE = 20;
 
 const CachedSourceFileSchema = z.object({
   path: z.string().min(1).max(500),
   content: z.string().max(MAX_CACHED_FILE_CHARS),
+  imports: z.array(z.string().min(1).max(300)).optional().default([]),
 });
 
 const CachedRepoResponseSchema = AnalyzeResponseSchema.extend({
@@ -22,6 +24,7 @@ const CachedRepoResponseSchema = AnalyzeResponseSchema.extend({
   repoForks: z.number().optional(),
   repoLanguage: z.string().nullable().optional(),
   repoSizeKb: z.number().optional(),
+
   indexedFiles: z
     .array(
       z.object({
@@ -29,7 +32,21 @@ const CachedRepoResponseSchema = AnalyzeResponseSchema.extend({
       })
     )
     .default([]),
+
   analyzedFileCount: z.number().optional(),
+  partialAnalysis: z.boolean().optional(),
+  analysisWarnings: z.array(z.string()).optional(),
+
+  repositoryRisks: z
+    .array(
+      z.object({
+        level: z.enum(["low", "medium", "high"]),
+        title: z.string(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+
   indexingStrategy: z.string().optional(),
 });
 
@@ -63,7 +80,7 @@ function sanitizeCachedText(value: string) {
 
 function trimSourceFiles(sourceFiles: StoredSourceFile[]) {
   let totalChars = 0;
-  const boundedFiles: StoredSourceFile[] = [];
+  const boundedFiles: z.infer<typeof CachedSourceFileSchema>[] = [];
 
   for (const file of sourceFiles.slice(0, MAX_CACHED_SOURCE_FILES)) {
     const safePath = sanitizeCachedText(file.path).slice(0, 500);
@@ -71,6 +88,14 @@ function trimSourceFiles(sourceFiles: StoredSourceFile[]) {
       0,
       MAX_CACHED_FILE_CHARS
     );
+
+    const safeImports = Array.isArray(file.imports)
+      ? file.imports
+          .filter((value) => typeof value === "string")
+          .map((value) => sanitizeCachedText(value).slice(0, 300))
+          .filter(Boolean)
+          .slice(0, MAX_CACHED_IMPORTS_PER_FILE)
+      : [];
 
     const nextTotal = totalChars + safeContent.length;
 
@@ -81,6 +106,7 @@ function trimSourceFiles(sourceFiles: StoredSourceFile[]) {
     boundedFiles.push({
       path: safePath,
       content: safeContent,
+      imports: safeImports,
     });
 
     totalChars = nextTotal;
