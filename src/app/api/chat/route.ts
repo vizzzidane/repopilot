@@ -7,8 +7,10 @@ import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
 import { auth } from "../../../../auth";
 import { getAnalysisFromDb } from "@/lib/analysisDb";
-import { chunkRepositoryFiles } from "@/lib/retrieval/chunking";
-import { rankChunksForQuestion } from "@/lib/retrieval/scoring";
+import {
+  buildRetrievedContext,
+  retrieveRelevantChunks,
+} from "@/lib/retrieval/hybridRetriever";
 
 type SourceFile = {
   path: string;
@@ -47,40 +49,6 @@ function isTracingQuestion(question: string) {
     q.includes("how does") ||
     q.includes("where is")
   );
-}
-
-function cleanSourceFiles(files: SourceFile[], question: string) {
-  const sanitizedFiles = files
-    .slice(0, MAX_FILES_FOR_CHAT)
-    .map((file) => ({
-      path: file.path,
-      content: file.content.slice(0, MAX_CHARS_PER_FILE),
-    }));
-
-  const chunks = chunkRepositoryFiles(sanitizedFiles);
-
-  const rankedChunks = rankChunksForQuestion(question, chunks, {
-    maxResults: MAX_FILES_FOR_CHAT,
-  });
-
-  if (rankedChunks.length === 0) {
-    return sanitizedFiles;
-  }
-
-  return rankedChunks.map((chunk) => ({
-    path: `${chunk.filePath}#L${chunk.startLine}-L${chunk.endLine}`,
-    content: chunk.content,
-  }));
-}
-
-function buildRepoContext(files: SourceFile[]) {
-  return files
-    .map(
-      (file) => `<repo_file path="${file.path}">
-${file.content}
-</repo_file>`
-    )
-    .join("\n\n---\n\n");
 }
 
 function cleanJsonOutput(text: string) {
@@ -265,19 +233,34 @@ export async function POST(req: NextRequest) {
       ? analysis.sourceFiles
       : [];
 
-    const selectedFiles = cleanSourceFiles(
-      rawSourceFiles.filter(
-        (file): file is SourceFile =>
-          typeof file === "object" &&
-          file !== null &&
-          "path" in file &&
-          "content" in file &&
-          typeof (file as { path?: unknown }).path === "string" &&
-          typeof (file as { content?: unknown }).content === "string"
-      ),
-      question
+    const validatedFiles = rawSourceFiles.filter(
+      (file): file is SourceFile =>
+        typeof file === "object" &&
+        file !== null &&
+        "path" in file &&
+        "content" in file &&
+        typeof (file as { path?: unknown }).path === "string" &&
+        typeof (file as { content?: unknown }).content === "string"
     );
-    const repoContext = buildRepoContext(selectedFiles);
+
+    const sanitizedFiles = validatedFiles
+      .slice(0, MAX_FILES_FOR_CHAT)
+      .map((file) => ({
+        path: file.path,
+        content: file.content.slice(0, MAX_CHARS_PER_FILE),
+      }));
+
+    const retrievalResult = retrieveRelevantChunks(
+      question,
+      sanitizedFiles,
+      {
+        maxResults: MAX_FILES_FOR_CHAT,
+      }
+    );
+
+    const repoContext = buildRetrievedContext(
+      retrievalResult.selectedChunks
+    );
 
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {
       return NextResponse.json(
@@ -453,7 +436,10 @@ Rules:
       answerMarkdown: parsed.answerMarkdown,
       mermaidDiagram: parsed.mermaidDiagram?.trim() || "",
       mode: tracingMode ? "execution_path_tracing" : "repo_qa",
-      filesUsed: selectedFiles.map((file) => file.path),
+      filesUsed: retrievalResult.selectedChunks.map(
+        (chunk) =>
+          `${chunk.filePath}#L${chunk.startLine}-L${chunk.endLine}`
+      ),
     });
   } catch (error) {
     console.error({
