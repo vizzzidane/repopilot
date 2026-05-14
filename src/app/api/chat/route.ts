@@ -179,28 +179,28 @@ export async function POST(req: NextRequest) {
     if (!question || typeof question !== "string") {
       return NextResponse.json(
         { error: "Question is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (question.length > MAX_QUESTION_LENGTH) {
       return NextResponse.json(
         { error: "Question is too long." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!analysisId || typeof analysisId !== "string") {
       return NextResponse.json(
         { error: "analysisId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (analysisId.length > MAX_ANALYSIS_ID_LENGTH) {
       return NextResponse.json(
         { error: "Invalid analysisId." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
           error:
             "Analysis session expired or not found. Please analyze the repository again.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
         {
           error: "You do not have access to this analysis session.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
         "path" in file &&
         "content" in file &&
         typeof (file as { path?: unknown }).path === "string" &&
-        typeof (file as { content?: unknown }).content === "string"
+        typeof (file as { content?: unknown }).content === "string",
     );
 
     const sanitizedFiles = validatedFiles
@@ -250,24 +250,28 @@ export async function POST(req: NextRequest) {
         content: file.content.slice(0, MAX_CHARS_PER_FILE),
       }));
 
-    const retrievalResult = retrieveRelevantChunks(
-      question,
-      sanitizedFiles,
-      {
-        maxResults: MAX_FILES_FOR_CHAT,
-      }
+    const retrievalResult = retrieveRelevantChunks(question, sanitizedFiles, {
+      maxResults: MAX_FILES_FOR_CHAT,
+    });
+
+    const filesUsed = retrievalResult.selectedChunks.map(
+      (chunk) => `${chunk.filePath}#L${chunk.startLine}-L${chunk.endLine}`,
     );
 
-    const repoContext = buildRetrievedContext(
-      retrievalResult.selectedChunks
-    );
+    const retrievalMetadata = {
+      fallbackUsed: retrievalResult.fallbackUsed,
+      chunksUsed: retrievalResult.selectedChunks.length,
+      filesUsed,
+    };
+
+    const repoContext = buildRetrievedContext(retrievalResult.selectedChunks);
 
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {
       return NextResponse.json(
         {
           error: "Repository context is too large for chat analysis.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -401,7 +405,7 @@ Rules:
         outputChars: response.output_text.length,
         estimatedInputTokens: estimateTokensFromChars(prompt.length),
         estimatedOutputTokens: estimateTokensFromChars(
-          response.output_text.length
+          response.output_text.length,
         ),
         success: true,
       });
@@ -425,7 +429,7 @@ Rules:
 
     if (!rawText) {
       throw new Error(
-        "OpenAI returned an empty answer. Try again with a shorter question."
+        "OpenAI returned an empty answer. Try again with a shorter question.",
       );
     }
 
@@ -436,10 +440,8 @@ Rules:
       answerMarkdown: parsed.answerMarkdown,
       mermaidDiagram: parsed.mermaidDiagram?.trim() || "",
       mode: tracingMode ? "execution_path_tracing" : "repo_qa",
-      filesUsed: retrievalResult.selectedChunks.map(
-        (chunk) =>
-          `${chunk.filePath}#L${chunk.startLine}-L${chunk.endLine}`
-      ),
+      filesUsed,
+      retrieval: retrievalMetadata,
     });
   } catch (error) {
     console.error({
@@ -453,7 +455,7 @@ Rules:
         requestId,
         error: "Something went wrong while answering the repo question.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
