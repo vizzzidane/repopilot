@@ -320,6 +320,75 @@ export default function HomePage() {
     }
   }
 
+  function downloadTextFile(filename: string, content: string) {
+    const blob = new Blob([content], {
+      type: "text/markdown;charset=utf-8",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+
+    URL.revokeObjectURL(url);
+  }
+
+  function buildOnboardingMarkdown() {
+    if (!analysis) {
+      return "";
+    }
+
+    return `# ${analysis.repoOwner}/${analysis.repoNameRaw}
+
+## Repository Summary
+
+${analysis.summary || "No summary available."}
+
+---
+
+## Architecture Overview
+
+${analysis.mermaidDiagram || "No architecture diagram available."}
+
+---
+
+## Repository Risks
+
+${
+  Array.isArray(analysis.repositoryRisks) &&
+  analysis.repositoryRisks.length > 0
+    ? analysis.repositoryRisks
+        .map(
+          (risk: {
+            level: string;
+            title: string;
+            description: string;
+          }) =>
+            `- [${risk.level.toUpperCase()}] ${risk.title}: ${risk.description}`
+        )
+        .join("\n")
+    : "No major repository risks detected."
+}
+
+---
+
+## Indexed Files
+
+${
+  Array.isArray(analysis.indexedFiles)
+    ? analysis.indexedFiles
+        .map((file: { path: string }) => `- ${file.path}`)
+        .join("\n")
+    : "No indexed files."
+}
+`;
+  }
+
   const safeArchitectureDiagram = sanitizeMermaidDiagram(
     analysis?.mermaidDiagram
   );
@@ -565,6 +634,33 @@ export default function HomePage() {
                   <p className="mt-4 max-w-4xl leading-7 text-zinc-300">
                     {analysis.summary}
                   </p>
+                  
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadTextFile(
+                          `${analysis.repoNameRaw || "repository"}-onboarding.md`,
+                          buildOnboardingMarkdown()
+                        )
+                      }
+                      className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white transition hover:border-white/20 hover:bg-black/30"
+                    >
+                      Export onboarding.md
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(
+                          buildOnboardingMarkdown()
+                        );
+                      }}
+                      className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-white transition hover:border-white/20 hover:bg-black/30"
+                    >
+                      Copy Markdown
+                    </button>
+                  </div>
                 </div>
 
                 {analysis.analyzedFileCount && (
