@@ -7,6 +7,8 @@ import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
 import { auth } from "../../../../auth";
 import { getAnalysisFromDb } from "@/lib/analysisDb";
+import { chunkRepositoryFiles } from "@/lib/retrieval/chunking";
+import { rankChunksForQuestion } from "@/lib/retrieval/scoring";
 
 type SourceFile = {
   path: string;
@@ -47,10 +49,27 @@ function isTracingQuestion(question: string) {
   );
 }
 
-function cleanSourceFiles(files: SourceFile[]) {
-  return files.slice(0, MAX_FILES_FOR_CHAT).map((file) => ({
-    path: file.path,
-    content: file.content.slice(0, MAX_CHARS_PER_FILE),
+function cleanSourceFiles(files: SourceFile[], question: string) {
+  const sanitizedFiles = files
+    .slice(0, MAX_FILES_FOR_CHAT)
+    .map((file) => ({
+      path: file.path,
+      content: file.content.slice(0, MAX_CHARS_PER_FILE),
+    }));
+
+  const chunks = chunkRepositoryFiles(sanitizedFiles);
+
+  const rankedChunks = rankChunksForQuestion(question, chunks, {
+    maxResults: MAX_FILES_FOR_CHAT,
+  });
+
+  if (rankedChunks.length === 0) {
+    return sanitizedFiles;
+  }
+
+  return rankedChunks.map((chunk) => ({
+    path: `${chunk.filePath}#L${chunk.startLine}-L${chunk.endLine}`,
+    content: chunk.content,
   }));
 }
 
@@ -255,7 +274,8 @@ export async function POST(req: NextRequest) {
           "content" in file &&
           typeof (file as { path?: unknown }).path === "string" &&
           typeof (file as { content?: unknown }).content === "string"
-      )
+      ),
+      question
     );
     const repoContext = buildRepoContext(selectedFiles);
 
@@ -326,6 +346,7 @@ answerMarkdown rules:
 - Do not invent repository internals.
 - Avoid giant code blocks.
 - Use the previous chat only for conversational continuity; repository files remain the source of truth.
+- File paths may include line ranges like #L10-L40 when retrieved as focused chunks.
 
 mermaidDiagram rules:
 - Must be a valid Mermaid flowchart.
@@ -374,6 +395,7 @@ Rules:
 - Keep the answer demo-friendly.
 - mermaidDiagram must be an empty string.
 - Use the previous chat only for conversational continuity; repository files remain the source of truth.
+- File paths may include line ranges like #L10-L40 when retrieved as focused chunks.
 `;
 
     const model = "gpt-5.5";
