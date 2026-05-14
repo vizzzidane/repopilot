@@ -122,6 +122,7 @@ export default function HomePage() {
   const isSignedIn = status === "authenticated";
   const [repoUrl, setRepoUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState("");
   const [loadingStep, setLoadingStep] = useState(0);
   const [analysis, setAnalysis] = useState<any>(null);
   const [error, setError] = useState("");
@@ -155,10 +156,15 @@ export default function HomePage() {
     return `${(sizeKb / 1024).toFixed(1)} MB`;
   }
 
+  function updateLoadingStage(stage: string) {
+    setLoadingStage(stage);
+  }
+
   async function analyzeRepo() {
     if (!repoUrl.trim()) return;
 
     setLoading(true);
+    updateLoadingStage("Validating repository");
     setLoadingStep(0);
     setError("");
     setAnalysis(null);
@@ -173,6 +179,7 @@ export default function HomePage() {
     }, 1200);
 
     try {
+      updateLoadingStage("Fetching repository structure");
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -185,13 +192,18 @@ export default function HomePage() {
         throw new Error(data.error || "Failed to analyze repository");
       }
 
+      updateLoadingStage("Generating onboarding guide");
+
+      updateLoadingStage("Building architecture map");
       setAnalysis(data);
       saveLocalAnalysisSnapshot(data);
+      updateLoadingStage("Finalizing analysis");
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {
       clearInterval(loadingInterval);
       setLoading(false);
+      setLoadingStage("");
     }
   }
 
@@ -381,7 +393,9 @@ export default function HomePage() {
                 disabled={loading}
                 className="rounded-2xl bg-white px-6 py-4 font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
               >
-                {loading ? "Indexing Repo..." : "Analyze Repo"}
+                {loading
+                  ? loadingStage || "Analyzing repository..."
+                  : "Analyze Repo"}
               </button>
             </div>
           ) : (
@@ -396,6 +410,22 @@ export default function HomePage() {
               >
                 Sign in to continue
               </button>
+            </div>
+          )}
+
+          {loading && (
+            <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <div className="text-sm font-medium text-blue-200">
+                RepoPilot is analyzing the repository
+              </div>
+
+              <div className="mt-2 text-sm text-zinc-300">
+                {loadingStage || "Preparing analysis..."}
+              </div>
+
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full w-2/3 animate-pulse rounded-full bg-blue-400" />
+              </div>
             </div>
           )}
 
