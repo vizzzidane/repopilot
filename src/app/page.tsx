@@ -34,6 +34,11 @@ type CachedAnalysisSnapshot = {
   analysis: any;
 };
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 function readLocalAnalysisCache(): CachedAnalysisSnapshot[] {
   if (typeof window === "undefined") {
     return [];
@@ -131,6 +136,7 @@ export default function HomePage() {
   const [chatLoadingStep, setChatLoadingStep] = useState(0);
   const [chatAnswer, setChatAnswer] = useState("");
   const [chatMermaidDiagram, setChatMermaidDiagram] = useState("");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [indexedFilesOpen, setIndexedFilesOpen] = useState(false);
   const [historyLoadingId, setHistoryLoadingId] = useState("");
 
@@ -174,6 +180,8 @@ export default function HomePage() {
     setAnalysis(null);
     setChatAnswer("");
     setChatMermaidDiagram("");
+    setQuestion("");
+    setChatHistory([]);
     setIndexedFilesOpen(false);
 
     const loadingInterval = setInterval(() => {
@@ -218,6 +226,7 @@ export default function HomePage() {
     setChatAnswer("");
     setChatMermaidDiagram("");
     setQuestion("");
+    setChatHistory([]);
     setIndexedFilesOpen(false);
 
     if (cached) {
@@ -286,6 +295,7 @@ export default function HomePage() {
         body: JSON.stringify({
           question,
           analysisId: analysis.analysisId,
+          chatHistory,
         }),
       });
 
@@ -295,8 +305,23 @@ export default function HomePage() {
         throw new Error(data.error || "Failed to answer question");
       }
 
-      setChatAnswer(data.answerMarkdown || data.answer || "");
+      const assistantAnswer = data.answerMarkdown || data.answer || "";
+      setChatAnswer(assistantAnswer);
       setChatMermaidDiagram(sanitizeMermaidDiagram(data.mermaidDiagram));
+
+      setChatHistory((previous): ChatMessage[] =>
+        [
+          ...previous,
+          {
+            role: "user" as const,
+            content: question,
+          },
+          {
+            role: "assistant" as const,
+            content: assistantAnswer,
+          },
+        ].slice(-8)
+      );
 
       setTimeout(() => {
         answerRef.current?.scrollIntoView({
@@ -1104,6 +1129,30 @@ ${
                   </button>
                 ))}
               </div>
+
+              {chatHistory.length > 0 && (
+                <div className="mt-8 space-y-3">
+                  {chatHistory.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}`}
+                      className={[
+                        "rounded-xl border p-4 text-sm",
+                        message.role === "user"
+                          ? "border-blue-500/20 bg-blue-500/10 text-blue-100"
+                          : "border-white/10 bg-black/20 text-zinc-200",
+                      ].join(" ")}
+                    >
+                      <div className="mb-1 text-xs uppercase tracking-wide text-zinc-500">
+                        {message.role === "user" ? "You" : "RepoPilot"}
+                      </div>
+
+                      <div className="whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {chatAnswer && (
                 <div
