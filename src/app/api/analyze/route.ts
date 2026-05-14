@@ -716,7 +716,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
-    const rateLimitResponse = await checkAnalyzeRateLimit(req);
+    const rateLimitResponse = await checkAnalyzeRateLimit(req, userId);
 
     if (rateLimitResponse) {
       return rateLimitResponse;

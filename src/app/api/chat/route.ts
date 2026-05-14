@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
-    const rateLimitResponse = await checkChatRateLimit(req);
+    const rateLimitResponse = await checkChatRateLimit(req, userId);
 
     if (rateLimitResponse) {
       return rateLimitResponse;

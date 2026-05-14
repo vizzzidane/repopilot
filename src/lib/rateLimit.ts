@@ -58,17 +58,38 @@ function getClientIp(req: NextRequest) {
   return "unknown";
 }
 
-export async function checkAnalyzeRateLimit(req: NextRequest) {
+function normalizeRateLimitId(value: string) {
+  return value.replace(/[^a-zA-Z0-9:_@.-]/g, "_").slice(0, 120);
+}
+
+function buildRateLimitKeys(req: NextRequest, routeName: string, userId?: string) {
+  const ip = normalizeRateLimitId(getClientIp(req));
+
+  const keys = [`${routeName}:ip:${ip}`];
+
+  if (userId) {
+    keys.push(`${routeName}:user:${normalizeRateLimitId(userId)}`);
+  }
+
+  return keys;
+}
+
+export async function checkAnalyzeRateLimit(
+  req: NextRequest,
+  userId?: string
+) {
   return checkCombinedRateLimit(req, {
     routeName: "analyze",
+    userId,
     hourlyLimiter: analyzeHourlyRateLimit,
     dailyLimiter: analyzeDailyRateLimit,
   });
 }
 
-export async function checkChatRateLimit(req: NextRequest) {
+export async function checkChatRateLimit(req: NextRequest, userId?: string) {
   return checkCombinedRateLimit(req, {
     routeName: "chat",
+    userId,
     hourlyLimiter: chatHourlyRateLimit,
     dailyLimiter: chatDailyRateLimit,
   });
@@ -78,6 +99,7 @@ async function checkCombinedRateLimit(
   req: NextRequest,
   config: {
     routeName: string;
+    userId?: string;
     hourlyLimiter: Ratelimit | null;
     dailyLimiter: Ratelimit | null;
   }
@@ -96,47 +118,48 @@ async function checkCombinedRateLimit(
     return null;
   }
 
-  const ip = getClientIp(req);
-  const key = `${config.routeName}:${ip}`;
+  const keys = buildRateLimitKeys(req, config.routeName, config.userId);
 
-  const hourlyResult = await config.hourlyLimiter.limit(key);
+  for (const key of keys) {
+    const hourlyResult = await config.hourlyLimiter.limit(key);
 
-  if (!hourlyResult.success) {
-    return NextResponse.json(
-      {
-        error: "Too many requests. Please try again later.",
-        limitType: "hourly",
-      },
-      {
-        status: 429,
-        headers: {
-          "X-RateLimit-Limit": hourlyResult.limit.toString(),
-          "X-RateLimit-Remaining": hourlyResult.remaining.toString(),
-          "X-RateLimit-Reset": hourlyResult.reset.toString(),
-          "X-RateLimit-Window": "hourly",
+    if (!hourlyResult.success) {
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please try again later.",
+          limitType: "hourly",
         },
-      }
-    );
-  }
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": hourlyResult.limit.toString(),
+            "X-RateLimit-Remaining": hourlyResult.remaining.toString(),
+            "X-RateLimit-Reset": hourlyResult.reset.toString(),
+            "X-RateLimit-Window": "hourly",
+          },
+        }
+      );
+    }
 
-  const dailyResult = await config.dailyLimiter.limit(key);
+    const dailyResult = await config.dailyLimiter.limit(key);
 
-  if (!dailyResult.success) {
-    return NextResponse.json(
-      {
-        error: "Daily usage limit reached. Please try again tomorrow.",
-        limitType: "daily",
-      },
-      {
-        status: 429,
-        headers: {
-          "X-RateLimit-Limit": dailyResult.limit.toString(),
-          "X-RateLimit-Remaining": dailyResult.remaining.toString(),
-          "X-RateLimit-Reset": dailyResult.reset.toString(),
-          "X-RateLimit-Window": "daily",
+    if (!dailyResult.success) {
+      return NextResponse.json(
+        {
+          error: "Daily usage limit reached. Please try again tomorrow.",
+          limitType: "daily",
         },
-      }
-    );
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": dailyResult.limit.toString(),
+            "X-RateLimit-Remaining": dailyResult.remaining.toString(),
+            "X-RateLimit-Reset": dailyResult.reset.toString(),
+            "X-RateLimit-Window": "daily",
+          },
+        }
+      );
+    }
   }
 
   return null;
