@@ -577,13 +577,15 @@ export async function POST(req: NextRequest) {
       throw new Error("Could not read repository file tree.");
     }
 
-    if (treeData.tree.length > MAX_REPO_TREE_ITEMS) {
-      throw new Error(
-        "Repository is too large to analyse. Try a smaller public repository."
-      );
-    }
+    const repoTreeWasTruncated =
+      treeData.tree.length > MAX_REPO_TREE_ITEMS;
 
-    const selectedFiles = selectImportantFiles(treeData.tree);
+    const boundedTree = treeData.tree.slice(
+      0,
+      MAX_REPO_TREE_ITEMS
+    );
+
+    const selectedFiles = selectImportantFiles(boundedTree);
 
     if (selectedFiles.length === 0) {
       throw new Error("No useful files found in this repository");
@@ -669,6 +671,11 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
+    const repoWasPartiallyAnalyzed =
+      repoTreeWasTruncated ||
+      safeFiles.length !== initialFilesForLLM.length ||
+      cappedFiles.length !== safeFiles.length;
+
     const responsePayload = {
       ...aiAnalysis,
 
@@ -686,6 +693,13 @@ export async function POST(req: NextRequest) {
       })),
 
       analyzedFileCount: cappedFiles.length,
+      partialAnalysis: repoWasPartiallyAnalyzed,
+
+      analysisWarnings: repoWasPartiallyAnalyzed
+        ? [
+            "Large repository detected. RepoPilot analyzed the most important files only to stay within performance and token limits.",
+          ]
+        : [],
 
       indexingStrategy:
         "Secure server-side repository indexing with Redis-backed context storage.",
