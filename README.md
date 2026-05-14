@@ -1,110 +1,182 @@
 # RepoPilot
 
-AI onboarding copilot for GitHub repositories.
+AI-powered repository onboarding and codebase intelligence platform.
 
-RepoPilot helps developers understand unfamiliar GitHub repositories by selectively indexing high-signal files, generating architecture diagrams, identifying key files, suggesting contribution tasks, and tracing execution flows through the codebase.
+RepoPilot helps developers understand unfamiliar repositories by combining structured repository ingestion, architecture-aware retrieval, conversational analysis, and defensive AI engineering techniques.
 
----
-
-## Live Demo
-
-[Live Demo](https://repopilot-one.vercel.app/)
+It is designed to reduce onboarding time for large or unfamiliar codebases by generating grounded repository intelligence directly from source files.
 
 ---
 
-## GitHub Repository
+# What RepoPilot Does
 
-[GitHub Repository](https://github.com/vizzzidane/repopilot)
+RepoPilot analyzes GitHub repositories and generates:
 
----
-
-## The Problem
-
-Developers often waste significant time trying to understand unfamiliar repositories before they can contribute productively.
-
-Even experienced engineers struggle to:
-
-- identify important files
-- understand repository architecture
-- trace execution flows
-- figure out where to start contributing
-- onboard quickly onto large codebases
-
----
-
-## The Solution
-
-RepoPilot acts as an AI onboarding copilot for GitHub repositories.
-
-Instead of indexing an entire repository blindly, RepoPilot selectively extracts high-signal files such as:
-
-- README files
-- configuration files
-- app entry points
-- API routes
-- services
-- core source files
-
-Using those files, RepoPilot generates:
-
-- repository summaries
-- architecture explanations
-- architecture diagrams
+- repository architecture summaries
+- execution flow explanations
 - onboarding guidance
-- contribution ideas
-- setup steps
-- execution flow traces
+- repository risk analysis
+- contribution starting points
+- architecture diagrams
 - repository-specific Q&A
+- conversational codebase exploration
+
+Unlike naive "index everything" approaches, RepoPilot selectively retrieves high-signal files and applies defensive filtering before repository content reaches the language model.
 
 ---
 
-## Key Features
+# Core Features
 
-### Selective Repository Indexing
+## Repository Analysis
 
-Indexes only high-signal files instead of flooding the context window with unnecessary code.
+- High-signal repository indexing
+- Architecture-aware file selection
+- Dependency-aware retrieval
+- Large repository handling with partial analysis fallback
+- Execution flow tracing
 
-### Repository Summary
+## Conversational Repository Memory
 
-Generates a concise technical overview of the repository.
+- Multi-turn repository Q&A
+- Context-aware follow-up questions
+- Repository session continuity
+- Analysis history persistence
 
-### Architecture Diagrams
+## Architecture Visualization
 
-Creates Mermaid-based visual architecture diagrams automatically.
+- Mermaid-based architecture diagrams
+- Execution flow diagrams
+- Key dependency visibility
 
-### Indexed Files Transparency
+## Security and Defensive AI Engineering
 
-Shows exactly which files were indexed for analysis.
+- SSRF-safe GitHub URL validation
+- Prompt injection redaction
+- Secret redaction before LLM ingestion
+- Bounded token/context handling
+- Input sanitization
+- Auth-aware API protection
+- User + IP rate limiting
 
-### GitHub File Links
+## Reliability and Engineering Workflow
 
-Provides grounded navigation directly back to GitHub source files.
-
-### Key Files to Inspect
-
-Highlights the most important files for onboarding.
-
-### Contribution Guidance
-
-Suggests beginner-friendly contribution starting points.
-
-### Risk and Unknowns Analysis
-
-Identifies unclear or potentially risky areas in the repository.
-
-### Repository-Specific Q&A
-
-Answers questions about the repository using the indexed files.
-
-### Execution Flow Tracing
-
-Traces execution paths and generates flow diagrams for repository-specific questions.
+- CI/CD validation pipeline
+- Automated regression testing
+- Usage observability and token estimation
+- Repository analysis caching
+- Structured retrieval chunking foundation
 
 ---
 
-## Demo Repository
+# Architecture Overview
 
-Main demo repository used during presentation:
+## Analysis Pipeline
 
-```text
-https://github.com/vizzzidane/ipl-live-win-probability-predictor
+1. Validate and sanitize GitHub repository URL
+2. Fetch repository metadata from GitHub
+3. Select high-signal files
+4. Filter blocked or dangerous files
+5. Redact secrets and prompt-injection patterns
+6. Build architecture-aware repository context
+7. Generate repository intelligence using OpenAI
+8. Persist analysis history and cached results
+
+## Chat Pipeline
+
+1. Load repository analysis context
+2. Load bounded conversational history
+3. Retrieve relevant repository files
+4. Assemble grounded prompt context
+5. Generate repository-specific responses
+6. Persist conversational continuity
+
+---
+
+# Retrieval Strategy
+
+RepoPilot intentionally avoids blindly embedding entire repositories into context windows.
+
+Current retrieval system includes:
+
+- selective repository indexing
+- dependency-aware retrieval
+- source file chunking
+- bounded context assembly
+- architecture-aware prompt construction
+
+The retrieval layer is designed to evolve toward semantic vector retrieval for large-scale repositories.
+
+---
+
+# Security Considerations
+
+RepoPilot treats repository content as untrusted input.
+
+Current protections include:
+
+- HTTPS-only GitHub validation
+- non-GitHub host rejection
+- credential stripping
+- prompt injection redaction
+- secret scanning/redaction
+- request rate limiting
+- bounded memory/context windows
+- defensive sanitization
+- controlled repository ingestion
+
+---
+
+# Tech Stack
+
+## Frontend
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+- React Markdown
+- Mermaid
+
+## Backend
+
+- Next.js App Router APIs
+- OpenAI API
+- Prisma ORM
+- PostgreSQL
+- NextAuth
+- Upstash Redis
+- Upstash Rate Limit
+
+## Tooling
+
+- Vitest
+- GitHub Actions
+- ESLint
+- Prisma
+
+---
+
+# Testing and CI
+
+RepoPilot includes:
+
+- automated build validation
+- security regression tests
+- retrieval utility tests
+- CI enforcement through GitHub Actions
+
+Every push runs:
+
+- dependency installation
+- Prisma validation
+- automated tests
+- production build verification
+
+---
+
+# Local Development
+
+## 1. Install dependencies
+
+```bash
+npm install
