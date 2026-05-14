@@ -92,19 +92,41 @@ Unlike naive "index everything" approaches, RepoPilot selectively retrieves high
 
 ---
 
-# Retrieval Strategy
+# Retrieval Architecture
 
-RepoPilot intentionally avoids blindly embedding entire repositories into context windows.
+RepoPilot uses a bounded retrieval pipeline instead of blindly sending entire repositories into model context windows.
 
-Current retrieval system includes:
+The current retrieval flow is:
 
-- selective repository indexing
-- dependency-aware retrieval
-- source file chunking
-- bounded context assembly
-- architecture-aware prompt construction
+1. **Selected file ingestion**  
+   RepoPilot prioritizes high-signal repository files such as route handlers, source modules, package manifests, configuration files, architecture-relevant utilities, and README files. Sensitive files are filtered before ingestion.
 
-The retrieval layer is designed to evolve toward semantic vector retrieval for large-scale repositories.
+2. **Defensive preprocessing**  
+   Repository content is treated as untrusted input. Secret scanning and prompt-injection redaction run before repository text reaches the language model.
+
+3. **Chunking**  
+   Repository files are split into bounded chunks so retrieval can operate at section level granularity instead of only whole-file retrieval. Chunking also keeps context assembly within safe token limits.
+
+4. **Deterministic scoring**  
+   Current retrieval primarily uses deterministic ranking signals such as keyword overlap, file path relevance, filename importance, and architecture-aware heuristics.
+
+5. **Hybrid retriever layer**  
+   Retrieval logic is intended to flow through `hybridRetriever.ts` so ranking, chunking, fallback handling, and retrieval limits remain centralized instead of duplicated across API routes.
+
+6. **Embedding utility layer**  
+   RepoPilot includes the foundation for semantic retrieval, but embeddings are not fully wired into the default retrieval path yet. Embeddings should be generated during repository analysis, cached, and reused later during chat requests.
+
+7. **Embedding cache abstraction**  
+   Future semantic retrieval should first check a cache before generating embeddings. Cache misses may call the embedding provider while cache hits reuse stored vectors to reduce latency and token cost.
+
+8. **Graceful fallback behavior**  
+   If semantic retrieval is disabled, unavailable, rate-limited, or fails, RepoPilot should fall back to deterministic retrieval instead of blocking chat responses.
+
+Current limitations:
+
+- Semantic embeddings are not fully enabled in the primary retrieval pipeline yet.
+- Retrieval currently relies mostly on deterministic ranking.
+- Future semantic retrieval must remain feature-flagged, cached, bounded, and protected against prompt-injection and secret leakage.
 
 ---
 
@@ -180,3 +202,4 @@ Every push runs:
 
 ```bash
 npm install
+```
