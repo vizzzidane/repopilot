@@ -157,6 +157,10 @@ export default function HomePage() {
   }
 
   function updateLoadingStage(stage: string) {
+    toggleLoadingStage(stage);
+  }
+
+  function toggleLoadingStage(stage: string) {
     setLoadingStage(stage);
   }
 
@@ -203,7 +207,7 @@ export default function HomePage() {
     } finally {
       clearInterval(loadingInterval);
       setLoading(false);
-      setLoadingStage("");
+      updateLoadingStage("");
     }
   }
 
@@ -478,6 +482,70 @@ export default function HomePage() {
                           • {warning}
                         </div>
                       )
+                    )}
+                  </div>
+                </div>
+              )}
+
+            {Array.isArray(analysis?.repositoryRisks) &&
+              analysis.repositoryRisks.length > 0 && (
+                <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">
+                        Repository Risk Scanner
+                      </h3>
+
+                      <div className="mt-1 text-sm text-zinc-400">
+                        Automated engineering and repository hygiene observations.
+                      </div>
+                    </div>
+
+                    <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-zinc-400">
+                      Experimental
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {analysis.repositoryRisks.map(
+                      (
+                        risk: {
+                          level: string;
+                          title: string;
+                          description: string;
+                        },
+                        index: number
+                      ) => {
+                        const riskStyles =
+                          risk.level === "high"
+                            ? "border-red-500/20 bg-red-500/10 text-red-200"
+                            : risk.level === "medium"
+                            ? "border-yellow-500/20 bg-yellow-500/10 text-yellow-200"
+                            : "border-blue-500/20 bg-blue-500/10 text-blue-200";
+
+                        return (
+                          <div
+                            key={`${risk.title}-${index}`}
+                            className={`rounded-xl border p-4 ${riskStyles}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-medium">
+                                  {risk.title}
+                                </div>
+
+                                <div className="mt-1 text-sm opacity-90">
+                                  {risk.description}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 rounded-full border border-current/20 px-2 py-1 text-[10px] uppercase tracking-wide">
+                                {risk.level}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
                     )}
                   </div>
                 </div>

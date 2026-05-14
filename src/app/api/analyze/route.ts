@@ -30,6 +30,12 @@ type SelectedFile = {
   content: string;
 };
 
+type RepositoryRisk = {
+  level: "low" | "medium" | "high";
+  title: string;
+  description: string;
+};
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -544,6 +550,108 @@ Mermaid diagram rules:
   }
 }
 
+function scanRepositoryRisks(
+  tree: GitHubTreeItem[],
+  selectedFiles: SelectedFile[]
+): RepositoryRisk[] {
+  const risks: RepositoryRisk[] = [];
+
+  const paths = tree.map((item) => item.path.toLowerCase());
+
+  const hasReadme = paths.some((path) =>
+    path.endsWith("readme.md")
+  );
+
+  const hasTests = paths.some(
+    (path) =>
+      path.includes("test") ||
+      path.includes("spec") ||
+      path.includes("__tests__")
+  );
+
+  const hasGithubActions = paths.some((path) =>
+    path.includes(".github/workflows")
+  );
+
+  const hasEnvFiles = paths.some(
+    (path) =>
+      path.includes(".env") ||
+      path.includes("secret") ||
+      path.includes("credentials")
+  );
+
+  const hasDocker = paths.some(
+    (path) =>
+      path.includes("dockerfile") ||
+      path.includes("docker-compose")
+  );
+
+  if (!hasReadme) {
+    risks.push({
+      level: "medium",
+      title: "Missing README",
+      description:
+        "No README.md detected. Repository onboarding may be difficult.",
+    });
+  }
+
+  if (!hasTests) {
+    risks.push({
+      level: "medium",
+      title: "No obvious test suite",
+      description:
+        "No clear test directories or test files were detected.",
+    });
+  }
+
+  if (!hasGithubActions) {
+    risks.push({
+      level: "low",
+      title: "No CI/CD workflow detected",
+      description:
+        "No GitHub Actions workflows were found in the repository.",
+    });
+  }
+
+  if (hasEnvFiles) {
+    risks.push({
+      level: "high",
+      title: "Potential secret-related files detected",
+      description:
+        "Repository contains environment or credential-related filenames. Review carefully for exposed secrets.",
+    });
+  }
+
+  if (!hasDocker) {
+    risks.push({
+      level: "low",
+      title: "No containerization detected",
+      description:
+        "No Docker configuration files were detected.",
+    });
+  }
+
+  if (tree.length > MAX_REPO_TREE_ITEMS) {
+    risks.push({
+      level: "medium",
+      title: "Large repository",
+      description:
+        "Repository exceeds the recommended analysis size and may require partial analysis.",
+    });
+  }
+
+  if (selectedFiles.length < 5) {
+    risks.push({
+      level: "medium",
+      title: "Low repository signal",
+      description:
+        "Only a small number of meaningful files were selected for analysis.",
+    });
+  }
+
+  return risks.slice(0, 8);
+}
+
 export async function POST(req: NextRequest) {
   const requestId = createRequestId();
 
@@ -756,6 +864,11 @@ export async function POST(req: NextRequest) {
       safeFiles.length !== initialFilesForLLM.length ||
       cappedFiles.length !== safeFiles.length;
 
+    const repositoryRisks = scanRepositoryRisks(
+      treeData.tree,
+      cappedFiles
+    );
+
     const responsePayload = {
       ...aiAnalysis,
 
@@ -774,6 +887,7 @@ export async function POST(req: NextRequest) {
 
       analyzedFileCount: cappedFiles.length,
       partialAnalysis: repoWasPartiallyAnalyzed,
+      repositoryRisks,
 
       analysisWarnings: repoWasPartiallyAnalyzed
         ? [
