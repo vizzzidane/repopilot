@@ -3,6 +3,8 @@ import { auth } from "../../../../auth";
 import { getUserAnalysesFromDb } from "@/lib/analysisDb";
 import { createRequestId } from "@/lib/requestId";
 
+const MAX_HISTORY_ITEMS = 50;
+
 export async function GET() {
   const requestId = createRequestId();
 
@@ -12,14 +14,17 @@ export async function GET() {
 
     if (!userId) {
       return NextResponse.json(
-        { error: "Authentication required." },
-        { status: 401 }
+        {
+          requestId,
+          error: "Authentication required.",
+        },
+        { status: 401 },
       );
     }
 
     const analyses = await getUserAnalysesFromDb(userId);
 
-    const history = analyses.map((analysis) => ({
+    const history = analyses.slice(0, MAX_HISTORY_ITEMS).map((analysis) => ({
       analysisId: analysis.id,
       repoOwner: analysis.repoOwner,
       repoNameRaw: analysis.repoNameRaw,
@@ -27,7 +32,17 @@ export async function GET() {
       createdAt: analysis.createdAt.toISOString(),
     }));
 
-    return NextResponse.json({ history });
+    return NextResponse.json(
+      {
+        requestId,
+        history,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
   } catch (error) {
     console.error({
       requestId,
@@ -40,7 +55,7 @@ export async function GET() {
         requestId,
         error: "Failed to fetch analysis history.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
