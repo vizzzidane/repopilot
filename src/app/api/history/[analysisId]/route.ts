@@ -11,7 +11,6 @@ type RouteContext = {
 
 const MAX_ANALYSIS_ID_LENGTH = 100;
 const MAX_HISTORY_SOURCE_FILES = 50;
-const MAX_HISTORY_SOURCE_CHARS_PER_FILE = 2000;
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   const requestId = createRequestId();
@@ -63,22 +62,19 @@ export async function GET(_req: NextRequest, context: RouteContext) {
           if (
             typeof file !== "object" ||
             file === null ||
-            !("path" in file) ||
-            !("content" in file)
+            !("path" in file)
           ) {
             return null;
           }
 
           const path = (file as { path?: unknown }).path;
-          const content = (file as { content?: unknown }).content;
 
-          if (typeof path !== "string" || typeof content !== "string") {
+          if (typeof path !== "string") {
             return null;
           }
 
           return {
             path,
-            content: content.slice(0, MAX_HISTORY_SOURCE_CHARS_PER_FILE),
           };
         })
       : [];
