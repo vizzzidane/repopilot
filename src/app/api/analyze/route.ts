@@ -22,6 +22,7 @@ import {
   hasPromptInjectionSignal,
   redactPromptInjectionText,
 } from "@/lib/security/promptInjection";
+import { sanitizeMermaidDiagram } from "@/lib/mermaid";
 
 type GitHubTreeItem = {
   path: string;
@@ -593,7 +594,25 @@ Mermaid diagram rules:
     });
 
     const cleaned = cleanJsonOutput(response.output_text);
-    return JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned);
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof parsed.projectName !== "string" ||
+      typeof parsed.summary !== "string" ||
+      !Array.isArray(parsed.techStack) ||
+      !Array.isArray(parsed.setupSteps) ||
+      !Array.isArray(parsed.keyFiles) ||
+      typeof parsed.architectureExplanation !== "string" ||
+      typeof parsed.mermaidDiagram !== "string" ||
+      !Array.isArray(parsed.firstContributionTasks) ||
+      !Array.isArray(parsed.risksOrUnknowns)
+    ) {
+      throw new Error("OpenAI returned invalid analysis JSON.");
+    }
+
+    return parsed;
   } catch (error) {
     logUsage({
       route: "/api/analyze",
@@ -723,6 +742,7 @@ export async function POST(req: NextRequest) {
     if (!userId) {
       return NextResponse.json(
         {
+          requestId,
           error: "Authentication required.",
         },
         { status: 401 }
@@ -741,14 +761,20 @@ export async function POST(req: NextRequest) {
 
     if (!repoUrl || typeof repoUrl !== "string") {
       return NextResponse.json(
-        { error: "Repository URL is required" },
+        {
+          requestId,
+          error: "Repository URL is required",
+        },
         { status: 400 }
       );
     }
 
     if (repoUrl.length > MAX_REPO_URL_LENGTH) {
       return NextResponse.json(
-        { error: "Repository URL is too long." },
+        {
+          requestId,
+          error: "Repository URL is too long.",
+        },
         { status: 400 }
       );
     }
@@ -813,6 +839,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         analysisId,
         ...cached.response,
+        mermaidDiagram: sanitizeMermaidDiagram(cached.response.mermaidDiagram),
         analyzedFileCount: cachedCappedFiles.length,
         partialAnalysis:
           Boolean(cached.response.partialAnalysis) ||
@@ -913,6 +940,8 @@ export async function POST(req: NextRequest) {
       selectedFiles: cappedFiles,
     });
 
+    const safeMermaidDiagram = sanitizeMermaidDiagram(aiAnalysis.mermaidDiagram);
+
     const analysisId = createAnalysisId();
 
     await storeAnalysis(analysisId, {
@@ -960,7 +989,7 @@ export async function POST(req: NextRequest) {
 
     const responsePayload = {
       ...aiAnalysis,
-
+      mermaidDiagram: safeMermaidDiagram,
       repoOwner: owner,
       repoNameRaw: repo,
       defaultBranch,
