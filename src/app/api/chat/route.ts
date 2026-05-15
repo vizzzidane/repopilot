@@ -7,6 +7,7 @@ import { estimateTokensFromChars, logUsage } from "@/lib/usageLog";
 import { createRequestId } from "@/lib/requestId";
 import { auth } from "../../../../auth";
 import { getAnalysisFromDb } from "@/lib/analysisDb";
+import { sanitizeMermaidDiagram } from "@/lib/mermaid";
 import {
   buildRetrievedContext,
   retrieveRelevantChunks,
@@ -438,7 +439,7 @@ Rules:
     return NextResponse.json({
       answer: parsed.answerMarkdown,
       answerMarkdown: parsed.answerMarkdown,
-      mermaidDiagram: parsed.mermaidDiagram?.trim() || "",
+      mermaidDiagram: sanitizeMermaidDiagram(parsed.mermaidDiagram),
       mode: tracingMode ? "execution_path_tracing" : "repo_qa",
       filesUsed,
       retrieval: retrievalMetadata,
