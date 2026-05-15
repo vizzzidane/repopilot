@@ -156,7 +156,13 @@ export async function POST(req: NextRequest) {
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          requestId,
+          error: "Unauthorized",
+        },
+        { status: 401 },
+      );
     }
 
     const userId = session.user.id;
@@ -179,28 +185,40 @@ export async function POST(req: NextRequest) {
 
     if (!question || typeof question !== "string") {
       return NextResponse.json(
-        { error: "Question is required" },
+        {
+          requestId,
+          error: "Question is required",
+        },
         { status: 400 },
       );
     }
 
     if (question.length > MAX_QUESTION_LENGTH) {
       return NextResponse.json(
-        { error: "Question is too long." },
+        {
+          requestId,
+          error: "Question is too long.",
+        },
         { status: 400 },
       );
     }
 
     if (!analysisId || typeof analysisId !== "string") {
       return NextResponse.json(
-        { error: "analysisId is required" },
+        {
+          requestId,
+          error: "analysisId is required",
+        },
         { status: 400 },
       );
     }
 
     if (analysisId.length > MAX_ANALYSIS_ID_LENGTH) {
       return NextResponse.json(
-        { error: "Invalid analysisId." },
+        {
+          requestId,
+          error: "Invalid analysisId.",
+        },
         { status: 400 },
       );
     }
@@ -214,6 +232,7 @@ export async function POST(req: NextRequest) {
     if (!analysis) {
       return NextResponse.json(
         {
+          requestId,
           error:
             "Analysis session expired or not found. Please analyze the repository again.",
         },
@@ -224,6 +243,7 @@ export async function POST(req: NextRequest) {
     if (analysis.userId !== userId) {
       return NextResponse.json(
         {
+          requestId,
           error: "You do not have access to this analysis session.",
         },
         { status: 403 },
@@ -260,7 +280,7 @@ export async function POST(req: NextRequest) {
     );
 
     const retrievalMetadata = {
-      fallbackUsed: retrievalResult.fallbackUsed,
+      fallbackUsed: Boolean(retrievalResult.fallbackUsed),
       chunksUsed: retrievalResult.selectedChunks.length,
       filesUsed,
     };
@@ -270,6 +290,7 @@ export async function POST(req: NextRequest) {
     if (repoContext.length > MAX_TOTAL_CONTEXT_CHARS) {
       return NextResponse.json(
         {
+          requestId,
           error: "Repository context is too large for chat analysis.",
         },
         { status: 400 },
@@ -437,6 +458,7 @@ Rules:
     const parsed = parseChatOutput(rawText);
 
     return NextResponse.json({
+      requestId,
       answer: parsed.answerMarkdown,
       answerMarkdown: parsed.answerMarkdown,
       mermaidDiagram: sanitizeMermaidDiagram(parsed.mermaidDiagram),
