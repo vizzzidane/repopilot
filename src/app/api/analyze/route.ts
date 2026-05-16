@@ -23,6 +23,7 @@ import {
   redactPromptInjectionText,
 } from "@/lib/security/promptInjection";
 import { sanitizeMermaidDiagram } from "@/lib/mermaid";
+import { buildImportGraph } from "@/lib/retrieval/importGraph";
 
 type GitHubTreeItem = {
   path: string;
@@ -930,6 +931,8 @@ export async function POST(req: NextRequest) {
       0
     );
 
+    const architectureGraph = buildImportGraph(cappedFiles);
+
     if (totalContextChars > REPO_LIMITS.maxTotalChars) {
       throw new Error("Repository context is too large to analyse safely.");
     }
@@ -987,6 +990,16 @@ export async function POST(req: NextRequest) {
       cappedFiles
     );
 
+    const boundedArchitectureGraph = {
+      entrypoints: architectureGraph.entrypoints.slice(0, 20),
+
+      edges: architectureGraph.edges.slice(0, 120).map((edge) => ({
+        from: edge.from,
+        to: edge.to,
+        kind: edge.kind,
+      })),
+    };
+
     const responsePayload = {
       ...aiAnalysis,
       mermaidDiagram: safeMermaidDiagram,
@@ -1002,6 +1015,7 @@ export async function POST(req: NextRequest) {
       indexedFiles: cappedFiles.map((file) => ({
         path: file.path,
       })),
+      architectureGraph: boundedArchitectureGraph,
 
       analyzedFileCount: cappedFiles.length,
       partialAnalysis: repoWasPartiallyAnalyzed,
